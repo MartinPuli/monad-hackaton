@@ -28,6 +28,8 @@ import {
 } from "@phosphor-icons/react";
 import { KntxMark } from "@/components/KntxMark";
 import { Rail } from "@/components/Rail";
+import { Hero } from "@/components/Hero";
+import { Confetti } from "@/components/Confetti";
 import { MOCK, TRIAL_SECONDS, EXPLORER_TX } from "@/lib/ghostrig";
 import { CHAIN } from "@/lib/wagmi";
 import { DEMO_PRICE_PER_FPS } from "@/lib/useSession";
@@ -135,6 +137,14 @@ export default function Home() {
       {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 pb-24 pt-5 md:px-6 md:pb-6">
+        {!isConnected && (
+          <Hero
+            onConnect={() => injected && connect({ connector: injected })}
+            connecting={isPending}
+            canConnect={!!injected}
+          />
+        )}
+
         {MOCK && (
           <div className="flex items-center gap-2.5 rounded-md border border-accent/30 bg-accent/10 px-4 py-2 text-sm text-foreground">
             <Lightning size={16} weight="fill" className="shrink-0 text-accent" />
@@ -372,6 +382,7 @@ export default function Home() {
                   </div>
                   {state.phase === "closed" && (
                     <div className="rounded-lg border border-online/30 bg-online/10 p-3">
+                      <Confetti />
                       <div className="flex items-center gap-2">
                         <Receipt size={16} weight="bold" className="text-online" />
                         <p className="text-sm font-semibold text-online">Sesión liquidada</p>

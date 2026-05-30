@@ -163,7 +163,14 @@ body {
   animation: kntx-rise 0.5s var(--ease-out-quint) both;
 }
 
+/* Settle celebration — single confetti fall, no library. */
+@keyframes kntx-confetti-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--drift), 105vh, 0) rotate(var(--rot)); opacity: 0.85; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .kntx-pulse, .kntx-tick-in, .kntx-rise { animation: none; }
   .kntx-ring::before { animation: none; }
+  .kntx-confetti { display: none; }
 }
