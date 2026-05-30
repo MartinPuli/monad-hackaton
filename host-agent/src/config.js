@@ -15,7 +15,9 @@ export const monadTestnet = defineChain({
 });
 
 export const CONTRACT_ADDRESS =
-  process.env.GHOSTRIG_ADDRESS || "0x2F9e911f380e03557Ec65F941Dba32c879172b9a";
+  process.env.GHOSTRIG_ADDRESS ||
+  process.env.GHOSTRIG_CONTRACT_ADDRESS ||
+  "0x2F9e911f380e03557Ec65F941Dba32c879172b9a";
 
 // HOST_PRIVATE_KEY must be set in the environment (never commit it).
 // This is the wallet that owns the rig and signs reportFps / closeSession.
@@ -58,11 +60,14 @@ export const GHOSTRIG_ABI = [
     name: "sessions",
     stateMutability: "view",
     inputs: [{ name: "", type: "uint256" }],
+    // Must match the DEPLOYED contract's auto-generated getter exactly (7 fields):
+    // client, rigId, deposit, accrued, pricePerFps, startTime, open.
     outputs: [
       { name: "client", type: "address" },
       { name: "rigId", type: "uint256" },
       { name: "deposit", type: "uint256" },
       { name: "accrued", type: "uint256" },
+      { name: "pricePerFps", type: "uint256" },
       { name: "startTime", type: "uint256" },
       { name: "open", type: "bool" },
     ],

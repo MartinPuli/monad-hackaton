@@ -80,9 +80,10 @@ async function tick(sessionId) {
       functionName: "sessions",
       args: [sessionId],
     });
-    const accrued = s[3];
+    // sessions() = [client, rigId, deposit, accrued, pricePerFps, startTime, open]
     const deposit = s[2];
-    const open = s[5];
+    const accrued = s[3];
+    const open = s[6];
     status.sessions[key] = {
       fps,
       accrued: accrued.toString(),
@@ -127,6 +128,37 @@ async function closeSession(sessionId) {
   }
 }
 
+// On startup, adopt any session already open on our rig (e.g. opened while the
+// agent was down, leaving the rig "busy"). Live ones get billed; exhausted ones
+// get closed — so the rig is freed and nothing stays stuck. Self-healing.
+async function reconcile() {
+  for (let i = 0n; ; i++) {
+    let s;
+    try {
+      s = await pub.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: GHOSTRIG_ABI,
+        functionName: "sessions",
+        args: [i],
+      });
+    } catch {
+      break; // read past the end of the sessions array → done
+    }
+    const rigId = s[1];
+    const deposit = s[2];
+    const accrued = s[3];
+    const open = s[6];
+    if (!open || rigId !== RIG_ID) continue;
+    if (accrued >= deposit) {
+      log(`reconcile: session ${i} open but exhausted → closing`);
+      await closeSession(i);
+    } else {
+      log(`reconcile: adopting live session ${i} on rig ${rigId}`);
+      startBilling(i);
+    }
+  }
+}
+
 // Listen for new sessions opened against our rig.
 function watch() {
   pub.watchContractEvent({
@@ -161,3 +193,4 @@ function serve() {
 
 watch();
 serve();
+reconcile().catch((e) => log("reconcile error:", e.shortMessage || e.message));
