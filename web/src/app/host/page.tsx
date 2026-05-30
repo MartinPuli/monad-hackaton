@@ -16,8 +16,10 @@ import {
   ArrowDown,
   WarningCircle,
   CircleNotch,
+  Broadcast,
 } from "@phosphor-icons/react";
 import { KntxMark } from "@/components/KntxMark";
+import { Rail } from "@/components/Rail";
 import { CHAIN } from "@/lib/wagmi";
 import { useHostEarnings } from "@/lib/useHostEarnings";
 
@@ -59,13 +61,15 @@ export default function HostDashboard() {
   }, [withdraw]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
-      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/95 px-5 py-3 backdrop-blur-sm">
+    <div className="flex min-h-[100dvh] flex-col md:pl-[68px]">
+      <Rail />
+
+      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/80 px-5 py-3 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <KntxMark size={22} className="text-accent kntx-glow" />
-          <span className="text-lg font-bold tracking-[0.2em]">KNTX</span>
-          <span className="ml-2 hidden border-l border-border pl-3 text-xs text-muted sm:inline">
-            panel del host · cobrá por tu GPU
+          <KntxMark size={20} className="text-accent kntx-glow md:hidden" />
+          <span className="font-display text-lg font-bold tracking-[0.18em] kntx-ink">KNTX</span>
+          <span className="ml-2 hidden items-center gap-1.5 border-l border-border pl-3 text-xs text-muted sm:inline-flex">
+            <Broadcast size={13} weight="fill" className="text-accent" /> panel del host · cobrá por tu GPU
           </span>
         </div>
         {isConnected ? (
@@ -80,7 +84,7 @@ export default function HostDashboard() {
           <button
             onClick={() => injected && connect({ connector: injected })}
             disabled={isPending || !injected}
-            className="flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50"
+            className="kntx-cta flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
           >
             {isPending ? <CircleNotch size={18} weight="bold" className="animate-spin" /> : <Wallet size={18} weight="bold" />}
             {isPending ? "Conectando" : "Conectar wallet"}
@@ -88,7 +92,7 @@ export default function HostDashboard() {
         )}
       </nav>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-6 md:px-5">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 pb-24 pt-5 md:px-6 md:pb-6">
         {wrongNetwork && (
           <div className="flex flex-wrap items-center gap-3 rounded-md border border-live/40 bg-live/10 px-4 py-2.5 text-sm">
             <WarningCircle size={18} weight="fill" className="shrink-0 text-live" />
@@ -104,19 +108,28 @@ export default function HostDashboard() {
         )}
 
         {!isConnected ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-surface px-6 py-12 text-center">
-            <Cpu size={40} weight="duotone" className="mb-1 text-accent kntx-glow" />
-            <p className="text-lg font-semibold">Conectá tu wallet para hostear</p>
+          <div className="kntx-rise flex flex-col items-center gap-2 rounded-xl border border-border bg-surface px-6 py-14 text-center">
+            <div className="kntx-ring mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-[oklch(0.2_0.03_286)]">
+              <Cpu size={28} weight="duotone" className="text-accent kntx-glow" />
+            </div>
+            <p className="font-display text-lg font-semibold">Conectá tu wallet para hostear</p>
             <p className="max-w-md text-sm text-muted">
               La wallet que conectes es la que <strong className="font-semibold text-foreground">cobra</strong>.
               Registrás tu rig una vez y la plata cae acá mientras alguien juega.
             </p>
+            <button
+              onClick={() => injected && connect({ connector: injected })}
+              disabled={isPending || !injected}
+              className="kntx-cta mt-2 flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+            >
+              <Wallet size={16} weight="bold" /> Conectar wallet
+            </button>
           </div>
         ) : (
           <>
             {/* Live earnings */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="relative overflow-hidden rounded-xl border border-online/30 bg-surface p-5">
+              <div className="kntx-rise relative overflow-hidden rounded-xl border border-online/30 bg-surface p-5">
                 {/* faint online halo so "en vivo" reads alive, not flat */}
                 <div
                   aria-hidden
@@ -126,7 +139,7 @@ export default function HostDashboard() {
                   <span className="kntx-pulse flex h-2 w-2 rounded-full bg-online" />
                   Ingreso en vivo
                 </div>
-                <div className="relative font-mono text-4xl font-bold tabular-nums text-online kntx-glow">
+                <div className="relative font-display text-4xl font-bold tabular-nums text-online kntx-glow">
                   {fmt(earnings.liveAccrued)}
                   <span className="ml-1.5 text-base font-medium text-muted">MON</span>
                 </div>
@@ -141,16 +154,16 @@ export default function HostDashboard() {
                   )}
                 </p>
               </div>
-              <div className="flex flex-col rounded-xl border border-border bg-surface p-5">
+              <div className="kntx-rise flex flex-col rounded-xl border border-border bg-surface p-5">
                 <CardHead icon={<Coins size={16} weight="fill" className="text-accent" />} label="Listo para retirar" />
-                <div className="font-mono text-4xl font-bold tabular-nums text-foreground">
+                <div className="font-display text-4xl font-bold tabular-nums text-foreground">
                   {fmt(earnings.claimable)}
                   <span className="ml-1.5 text-base font-medium text-muted">MON</span>
                 </div>
                 <button
                   onClick={onWithdraw}
                   disabled={earnings.claimable === 0n || busy !== null || wrongNetwork}
-                  className="mt-auto flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="kntx-cta mt-auto flex w-full items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {busy === "withdraw" ? <CircleNotch size={16} weight="bold" className="animate-spin" /> : <ArrowDown size={16} weight="bold" />}
                   Retirar a mi wallet
@@ -214,7 +227,7 @@ export default function HostDashboard() {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-border bg-surface p-5">{children}</div>;
+  return <div className="kntx-rise rounded-xl border border-border bg-surface p-5">{children}</div>;
 }
 
 function CardHead({ icon, label }: { icon: React.ReactNode; label: string }) {

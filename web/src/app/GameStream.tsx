@@ -7,10 +7,25 @@
 // billing in a single page.
 //
 // Host stream URL comes from NEXT_PUBLIC_STREAM_URL (e.g. http://192.168.112.212:47990/webrtc).
+//
+// IMPORTANT — iframe vs. window: Sunshine's web UI (port 47990) is HTTPS with a
+// self-signed cert AND sends `X-Frame-Options`, so it CANNOT be embedded in an
+// <iframe> (the browser blocks both the untrusted cert and the framing). For those
+// URLs we open the game in a separate window (which DOES let you accept the cert and
+// ignores X-Frame-Options) and keep the billing HUD floating in the app. Plain-HTTP
+// streams without X-Frame-Options still embed fine in the iframe.
 
 import { useEffect, useState } from "react";
 import { formatEther } from "viem";
-import { SignOut, Lightning, Wallet, Pencil, Monitor } from "@phosphor-icons/react";
+import {
+  SignOut,
+  Lightning,
+  Wallet,
+  Pencil,
+  Monitor,
+  ArrowSquareOut,
+  Warning,
+} from "@phosphor-icons/react";
 import { KntxMark } from "@/components/KntxMark";
 import type { SessionState } from "@/lib/useSession";
 
@@ -19,6 +34,14 @@ import type { SessionState } from "@/lib/useSession";
 const ENV_STREAM_URL = process.env.NEXT_PUBLIC_STREAM_URL ?? "";
 const STORAGE_KEY = "ghostrig.streamUrl";
 const fmt = (wei: bigint, dp = 6) => Number(formatEther(wei)).toFixed(dp);
+
+// HTTPS streams (e.g. Sunshine :47990) can't be iframed (self-signed cert +
+// X-Frame-Options). Open those in a separate window instead.
+const mustOpenInWindow = (url: string) => url.trim().toLowerCase().startsWith("https:");
+
+// Open the game in its own window. A user gesture is required or the popup is blocked.
+const openGameWindow = (url: string) =>
+  window.open(url, "kntx_game", "width=1280,height=760,noopener");
 
 export function GameStream({
   state,
@@ -42,17 +65,54 @@ export function GameStream({
     if (!url) setEditing(true); // prompt for it if we have none
   }, []);
 
+  const windowMode = mustOpenInWindow(streamUrl);
+
   const saveUrl = () => {
     const url = draft.trim();
     setStreamUrl(url);
     if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, url);
     setEditing(false);
+    // HTTPS streams can't be iframed → pop the game window straight from this click
+    // (a user gesture, so the popup blocker lets it through).
+    if (mustOpenInWindow(url)) openGameWindow(url);
   };
 
   return (
     <div className="fixed inset-0 z-30 bg-black">
       {/* The game, full screen */}
-      {streamUrl && !editing ? (
+      {streamUrl && !editing && windowMode ? (
+        // HTTPS (Sunshine :47990): can't iframe. Game runs in its own window; this
+        // panel just lets you (re)open it. The billing HUD floats on top as usual.
+        <div className="flex h-full w-full items-center justify-center p-6 text-center">
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md">
+            <div className="mb-5 flex items-center justify-center gap-2">
+              <KntxMark size={18} className="text-accent kntx-glow" />
+              <span className="font-display text-sm font-bold tracking-[0.2em] kntx-ink">KNTX</span>
+            </div>
+            <Monitor size={32} weight="duotone" className="mx-auto mb-3 text-accent" />
+            <p className="text-lg font-semibold text-foreground">El juego corre en una ventana aparte</p>
+            <p className="mt-1 text-sm text-muted">
+              Tu stream es <code className="font-mono text-accent">https</code> (Sunshine), que no se
+              puede embeber. Se abre en su propia ventana — el cobro on-chain sigue acá arriba en vivo.
+            </p>
+            <button
+              onClick={() => openGameWindow(streamUrl)}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98]"
+            >
+              <ArrowSquareOut size={16} weight="bold" />
+              Abrir / reabrir juego
+            </button>
+            <p className="mt-3 flex items-start gap-1.5 rounded-md bg-online/10 px-2.5 py-2 text-left text-[12px] text-muted">
+              <Warning size={14} weight="fill" className="mt-0.5 shrink-0 text-online" />
+              <span>
+                La 1ª vez la ventana muestra <b>“conexión no segura”</b> (cert autofirmado): clic en{" "}
+                <b>Avanzado → Continuar</b>, o tipeá <code className="font-mono">thisisunsafe</code> en
+                esa ventana. Luego ya carga el juego.
+              </span>
+            </p>
+          </div>
+        </div>
+      ) : streamUrl && !editing ? (
         <iframe
           src={streamUrl}
           title="Game stream"
@@ -64,7 +124,7 @@ export function GameStream({
           <div className="w-full max-w-md rounded-xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md">
             <div className="mb-5 flex items-center justify-center gap-2">
               <KntxMark size={18} className="text-accent kntx-glow" />
-              <span className="text-sm font-bold tracking-[0.2em] text-foreground">KNTX</span>
+              <span className="font-display text-sm font-bold tracking-[0.2em] kntx-ink">KNTX</span>
             </div>
             <Monitor size={32} weight="duotone" className="mx-auto mb-3 text-accent" />
             <p className="text-lg font-semibold text-foreground">URL del stream del host</p>
@@ -95,7 +155,7 @@ export function GameStream({
         <div className="pointer-events-auto rounded-xl border border-border bg-surface/90 p-4 shadow-2xl backdrop-blur-md">
           <div className="mb-3 flex items-center gap-1.5 border-b border-border pb-2.5">
             <KntxMark size={13} className="text-accent kntx-glow" />
-            <span className="text-[11px] font-bold tracking-[0.2em] text-foreground">KNTX</span>
+            <span className="font-display text-[11px] font-bold tracking-[0.2em] kntx-ink">KNTX</span>
           </div>
           {trial ? (
             <div className="mb-3 flex items-center gap-2 rounded-md bg-online/15 px-2.5 py-1.5 text-sm font-semibold text-online">

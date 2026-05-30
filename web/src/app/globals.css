@@ -32,6 +32,7 @@
   --color-online: var(--online);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
   --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -84,6 +85,85 @@ body {
   filter: drop-shadow(0 0 18px oklch(0.6 0.2 286 / 0.45));
 }
 
+/* ── Broadcast stage ──────────────────────────────────────────────────────
+   The stream surface. Layered so an empty stage still reads as "a screen that
+   could go live": a deep indigo vignette + a faint perspective-less grid +
+   broadcast scanlines. All static (no animation cost), pure texture. */
+.kntx-stage {
+  background-color: oklch(0.12 0.022 288);
+  background-image:
+    radial-gradient(120% 90% at 50% 0%, oklch(0.32 0.11 286 / 0.35), transparent 55%),
+    radial-gradient(90% 70% at 50% 120%, oklch(0.22 0.08 286 / 0.4), transparent 60%),
+    linear-gradient(oklch(0.7 0.05 286 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.7 0.05 286 / 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 38px 38px, 38px 38px;
+}
+/* Scanline veil — a separate overlay element so it sits above content cleanly. */
+.kntx-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    oklch(0 0 0 / 0.16) 0px,
+    oklch(0 0 0 / 0.16) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  mix-blend-mode: soft-light;
+  opacity: 0.6;
+}
+
+/* Live avatar ring — a conic brand-gradient ring that slowly rotates, the way
+   a Twitch channel avatar glows when the streamer is live. */
+@keyframes kntx-spin {
+  to { transform: rotate(360deg); }
+}
+.kntx-ring {
+  position: relative;
+  isolation: isolate;
+}
+.kntx-ring::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  z-index: -1;
+  background: conic-gradient(
+    from 0deg,
+    var(--accent),
+    var(--online),
+    var(--accent-hover),
+    var(--accent)
+  );
+  animation: kntx-spin 4s linear infinite;
+}
+
+/* Brand gradient ink — for the wordmark. */
+.kntx-ink {
+  background: linear-gradient(100deg, var(--foreground), var(--accent-hover) 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Primary action — brand gradient fill with a soft lift on hover. */
+.kntx-cta {
+  background-image: linear-gradient(120deg, var(--accent) 0%, oklch(0.62 0.22 300) 100%);
+  box-shadow: 0 8px 24px -10px oklch(0.5 0.2 286 / 0.7);
+}
+
+/* Soft entrance for hero blocks on first paint. */
+@keyframes kntx-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kntx-rise {
+  animation: kntx-rise 0.5s var(--ease-out-quint) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .kntx-pulse, .kntx-tick-in { animation: none; }
+  .kntx-pulse, .kntx-tick-in, .kntx-rise { animation: none; }
+  .kntx-ring::before { animation: none; }
 }
