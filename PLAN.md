@@ -121,14 +121,16 @@ hasta que se configure `NEXT_PUBLIC_GHOSTRIG_ADDRESS`. ABI acordada en `interfac
 
 ---
 
-## WB6 — Matchmaking / señalización 🟡
-**Objetivo:** conectar cliente y host.
+## WB6 — Conexión cliente↔host en LAN (Dev B) 🟡 — host listo, falta pairing con Martin
+**Objetivo:** conectar cliente y host vía Sunshine/Moonlight. Ver `docs/streaming-setup.md`.
 
-- [ ] Servidor de señalización mínimo (WebSocket) para el handshake WebRTC.
-- [ ] Lista simple de hosts disponibles (para la demo, 1 host basta).
-- [ ] 🟢 Emparejamiento por región/latencia (post-hackathon).
+- [x] **Host (PC Robertino):** Sunshine instalado, servicio + firewall LAN OK, app "Desktop" lista. IP `192.168.112.212`.
+- [ ] Host: crear cuenta en la consola web (`https://localhost:47990`) — pendiente, 1 min.
+- [ ] **Cliente (PC Martin):** instalar Moonlight, agregar host por IP.
+- [ ] **Pairing:** PIN de Moonlight → consola Sunshine (requiere ambas PCs juntas, hacer antes de la demo).
+- [ ] 🟢 Matchmaking por región/lista de hosts (post-hackathon; para la demo 1 host alcanza).
 
-**Entregable:** cliente y host se encuentran y conectan.
+**Entregable:** Martin ve el escritorio del host y abre Minecraft por streaming.
 
 ---
 
