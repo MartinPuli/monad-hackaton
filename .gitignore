@@ -1,0 +1,20 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.key
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# OS / editor
+.DS_Store
+Thumbs.db

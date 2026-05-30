@@ -18,14 +18,22 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 ---
 
-## WB0 — Setup 🔴
+## WB0 — Setup & decisiones ✅ COMPLETADO
 **Objetivo:** dejar el terreno listo para hackear sin fricción.
 
-- [ ] Crear wallet de deploy con `cast wallet new` y **persistirla** (`.env`, en `.gitignore`).
-- [ ] Fondear la wallet vía faucet de Monad (agent API).
-- [ ] Estructura de carpetas: `/contracts` (Foundry), `/web` (frontend), `/host-agent`, `/docs`.
+- [x] Decisiones cerradas (ver sección arriba).
+- [x] Foundry instalado (v1.7.1) en `~/.foundry/bin`.
+- [x] Estructura de carpetas: `/contracts` (Foundry init), `/web`, `/host-agent`.
+- [x] `foundry.toml` configurado (`evm_version = "prague"`, `solc 0.8.28`, rpc monad_testnet).
+- [x] Wallet de deploy creada y persistida en `.env` (en `.gitignore`).
+      Address: `0x66D5331F872069F9C204aF56835f664d545E2585`
+- [x] Wallet fondeada vía faucet: **1 MON** en testnet (balance confirmado).
+- [x] Archivos de ejemplo (Counter) eliminados.
 
-**Entregable:** repo con estructura + wallet fondeada en testnet.
+**Entregable:** ✅ repo con estructura + wallet fondeada en testnet.
+
+> Nota: `~/.foundry/bin` no está en el PATH permanente. En cada sesión de terminal nueva, anteponer:
+> `export PATH="$PATH:/c/Users/rober/.foundry/bin"` (o agregarlo al perfil).
 
 ---
 
@@ -203,3 +211,7 @@ Para no bloquearse, en WB0 escriben juntos **un archivo `interface.md`** con:
 
 ## Punto de sincronización (1 sola dependencia dura)
 Dev B necesita el **address + ABI** de Dev A (fin de WB3) para conectar de verdad. Hasta entonces, **ninguno espera al otro**: A construye/testea el contrato, B construye la UI + monta el streaming. Se juntan en la integración y la demo.
+
+## Decisiones de arquitectura derivadas
+- **Streaming ≠ web de pago:** son dos superficies. El jugador paga en la web (wallet) y juega vía Moonlight. El **host-agent** es el pegamento entre el contrato y Sunshine.
+- **Sunshine/Moonlight son GPL-3.0** → ok para hackathon; no contamina nuestro contrato ni web (procesos separados).
