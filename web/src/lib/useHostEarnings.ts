@@ -1,27 +1,24 @@
 "use client";
 
 // Host-side hook: live earnings dashboard for someone sharing their GPU.
-// Reads pendingWithdrawals (what's claimable), tracks live income from FpsReported
-// events on the host's rigs, lets the host register a rig and withdraw earnings.
-// All on-chain — the host's connected wallet IS the payout wallet (rig.host).
+//
+// DEMO WIRING: live income + claimable are driven by demoBus (the player page
+// publishes the hardcoded session there), so the dashboard fills up the instant
+// the player accrues — no dependency on the on-chain FpsReported loop. Rig
+// ownership (myRigIds) and registerRig stay real/on-chain.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { parseEther, type Address } from "viem";
-import {
-  useAccount,
-  usePublicClient,
-  useReadContract,
-  useWriteContract,
-  useWatchContractEvent,
-} from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ghostRigAbi, GHOSTRIG_ADDRESS } from "./ghostrig";
+import { demoBus, type DemoState, type DemoHost } from "./demoBus";
 
 export interface HostEarnings {
   /** Funds credited and ready to withdraw (wei). */
   claimable: bigint;
-  /** Income observed live this session via FpsReported (wei, cumulative display). */
+  /** Income observed live this session (wei, cumulative display). */
   liveAccrued: bigint;
-  /** Latest reported FPS across the host's active sessions. */
+  /** Latest reported FPS for the active session. */
   lastFps: number;
   /** rigIds owned by the connected wallet. */
   myRigIds: bigint[];
@@ -32,65 +29,52 @@ export function useHostEarnings() {
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
 
-  const [liveAccrued, setLiveAccrued] = useState(0n);
-  const [lastFps, setLastFps] = useState(0);
   const [myRigIds, setMyRigIds] = useState<bigint[]>([]);
-  const lastAccruedPerSession = useRef<Map<string, bigint>>(new Map());
-
-  // Claimable balance for the connected wallet.
-  const { data: claimable, refetch: refetchClaimable } = useReadContract({
-    address: GHOSTRIG_ADDRESS as Address,
-    abi: ghostRigAbi,
-    functionName: "pendingWithdrawals",
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address && GHOSTRIG_ADDRESS), refetchInterval: 4000 },
+  // Start from a static default (matches SSR) and hydrate from the bus in an
+  // effect — reading localStorage during the initial render would mismatch SSR.
+  const [bus, setBus] = useState<DemoState>({
+    live: null,
+    host: null,
+    claimable: "0",
+    totalEarned: "0",
   });
+
+  // Subscribe to the demo bus (player session + settled earnings).
+  useEffect(() => {
+    setBus(demoBus.get());
+    return demoBus.subscribe(setBus);
+  }, []);
 
   // Discover which rigs belong to the connected wallet (scan rigCount).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!address || !publicClient || !GHOSTRIG_ADDRESS) return;
-      const count = (await publicClient.readContract({
-        address: GHOSTRIG_ADDRESS as Address,
-        abi: ghostRigAbi,
-        functionName: "rigCount",
-      })) as bigint;
-      const mine: bigint[] = [];
-      for (let i = 0n; i < count; i++) {
-        const rig = (await publicClient.readContract({
+      try {
+        const count = (await publicClient.readContract({
           address: GHOSTRIG_ADDRESS as Address,
           abi: ghostRigAbi,
-          functionName: "rigs",
-          args: [i],
-        })) as readonly [Address, bigint, boolean];
-        if (rig[0].toLowerCase() === address.toLowerCase()) mine.push(i);
+          functionName: "rigCount",
+        })) as bigint;
+        const mine: bigint[] = [];
+        for (let i = 0n; i < count; i++) {
+          const rig = (await publicClient.readContract({
+            address: GHOSTRIG_ADDRESS as Address,
+            abi: ghostRigAbi,
+            functionName: "rigs",
+            args: [i],
+          })) as readonly [Address, bigint, boolean];
+          if (rig[0].toLowerCase() === address.toLowerCase()) mine.push(i);
+        }
+        if (!cancelled) setMyRigIds(mine);
+      } catch {
+        /* read failures shouldn't break the demo dashboard */
       }
-      if (!cancelled) setMyRigIds(mine);
     })();
     return () => {
       cancelled = true;
     };
   }, [address, publicClient]);
-
-  // Live income: watch FpsReported, sum per-session deltas of `accrued`.
-  useWatchContractEvent({
-    address: GHOSTRIG_ADDRESS as Address,
-    abi: ghostRigAbi,
-    eventName: "FpsReported",
-    enabled: Boolean(GHOSTRIG_ADDRESS && address),
-    onLogs: (logs) => {
-      for (const log of logs) {
-        const args = (log as unknown as { args: { sessionId: bigint; fps: bigint; accrued: bigint } }).args;
-        const key = args.sessionId.toString();
-        const prev = lastAccruedPerSession.current.get(key) ?? 0n;
-        const delta = args.accrued > prev ? args.accrued - prev : 0n;
-        lastAccruedPerSession.current.set(key, args.accrued);
-        if (delta > 0n) setLiveAccrued((v) => v + delta);
-        setLastFps(Number(args.fps));
-      }
-    },
-  });
 
   const registerRig = useCallback(
     async (pricePerFpsWei: bigint) => {
@@ -106,24 +90,35 @@ export function useHostEarnings() {
     [publicClient, writeContractAsync],
   );
 
+  // The MON already landed in the host wallet on settle (player sent it directly),
+  // so "withdraw" here just zeroes the claimable counter on the dashboard.
   const withdraw = useCallback(async () => {
-    if (!GHOSTRIG_ADDRESS) return;
-    const hash = await writeContractAsync({
-      address: GHOSTRIG_ADDRESS as Address,
-      abi: ghostRigAbi,
-      functionName: "withdraw",
-      args: [],
-    });
-    await publicClient?.waitForTransactionReceipt({ hash });
-    await refetchClaimable();
-  }, [publicClient, writeContractAsync, refetchClaimable]);
+    demoBus.clearClaimable();
+  }, []);
 
+  // Publish/update the host's stream profile (URL, game, availability). Mirror the
+  // URL into the key GameStream reads, so a same-browser player auto-loads it.
+  const publishHost = useCallback((partial: Partial<DemoHost>) => {
+    demoBus.publishHost(partial);
+    if (typeof window !== "undefined" && typeof partial.streamUrl === "string") {
+      localStorage.setItem("ghostrig.streamUrl", partial.streamUrl);
+    }
+  }, []);
+
+  const live = bus.live;
   const earnings: HostEarnings = {
-    claimable: (claimable as bigint | undefined) ?? 0n,
-    liveAccrued,
-    lastFps,
+    claimable: BigInt(bus.claimable),
+    liveAccrued: live?.active ? BigInt(live.accrued) : 0n,
+    lastFps: live?.active ? live.fps : 0,
     myRigIds,
   };
 
-  return { earnings, registerRig, withdraw, priceFromMonPerFps: (mon: string) => parseEther(mon || "0") };
+  return {
+    earnings,
+    host: bus.host,
+    registerRig,
+    withdraw,
+    publishHost,
+    priceFromMonPerFps: (mon: string) => parseEther(mon || "0"),
+  };
 }

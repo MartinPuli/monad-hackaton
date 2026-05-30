@@ -4,7 +4,7 @@
 // while they host, and withdraws their earnings. The connected wallet is the payout
 // wallet (it must be the one that registered the rig).
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from "wagmi";
 import { formatEther } from "viem";
 import {
@@ -17,6 +17,9 @@ import {
   WarningCircle,
   CircleNotch,
   Broadcast,
+  Monitor,
+  CheckCircle,
+  Eye,
 } from "@phosphor-icons/react";
 import { KntxMark } from "@/components/KntxMark";
 import { Rail } from "@/components/Rail";
@@ -31,10 +34,28 @@ export default function HostDashboard() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
-  const { earnings, registerRig, withdraw, priceFromMonPerFps } = useHostEarnings();
+  const { earnings, host, registerRig, withdraw, publishHost, priceFromMonPerFps } = useHostEarnings();
 
   const [priceMon, setPriceMon] = useState("0.000001");
   const [busy, setBusy] = useState<"register" | "withdraw" | null>(null);
+
+  // Stream profile form (URL / game / GPU). Seeded once from whatever the host
+  // last published, then editable.
+  const [streamUrl, setStreamUrl] = useState("");
+  const [game, setGame] = useState("Minecraft");
+  const [gpu, setGpu] = useState("RTX 4090");
+  const [seeded, setSeeded] = useState(false);
+  useEffect(() => {
+    if (seeded || !host) return;
+    setStreamUrl(host.streamUrl || "");
+    setGame(host.game || "Minecraft");
+    setGpu(host.gpu || "RTX 4090");
+    setSeeded(true);
+  }, [host, seeded]);
+
+  const available = host?.available ?? false;
+  const publishProfile = (over: { available?: boolean } = {}) =>
+    publishHost({ streamUrl: streamUrl.trim(), game: game.trim(), gpu: gpu.trim(), ...over });
 
   const injected = useMemo(
     () => connectors.find((c) => c.type === "injected") ?? connectors[0],
@@ -170,6 +191,100 @@ export default function HostDashboard() {
                 </button>
               </div>
             </div>
+
+            {/* Publish your game / stream */}
+            <Card>
+              <div className="mb-2 flex items-center gap-2">
+                <Broadcast size={16} weight="fill" className="text-accent" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  Publicá tu juego
+                </span>
+                <span
+                  className={`ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                    available
+                      ? "bg-online/15 text-online"
+                      : "bg-surface-2 text-muted"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${available ? "bg-online kntx-pulse" : "bg-muted"}`}
+                  />
+                  {available ? "Disponible" : "No disponible"}
+                </span>
+              </div>
+
+              <p className="mb-3 text-sm text-muted">
+                Pegá el endpoint <code className="font-mono text-accent">/webrtc</code> de tu host
+                (Vibeshine/LuminalShine expone el stream en el puerto{" "}
+                <code className="font-mono text-foreground">47990</code>). Usá tu IP de LAN para que
+                el jugador se conecte. Ej:{" "}
+                <code className="font-mono text-foreground">http://192.168.1.50:47990/webrtc</code>
+              </p>
+
+              <label htmlFor="streamUrl" className="text-xs font-medium text-foreground">
+                URL del stream
+              </label>
+              <div className="mt-1 flex items-center rounded-md border border-border bg-surface-2 focus-within:border-accent">
+                <Monitor size={16} weight="duotone" className="ml-3 shrink-0 text-muted" />
+                <input
+                  id="streamUrl"
+                  value={streamUrl}
+                  onChange={(e) => setStreamUrl(e.target.value)}
+                  placeholder="http://<tu-ip>:47990/webrtc"
+                  className="w-full bg-transparent px-3 py-2 font-mono text-sm text-foreground outline-none"
+                />
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="game" className="text-xs font-medium text-foreground">
+                    Juego
+                  </label>
+                  <input
+                    id="game"
+                    value={game}
+                    onChange={(e) => setGame(e.target.value)}
+                    placeholder="Minecraft"
+                    className="mt-1 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm outline-none transition-colors duration-200 ease-out-quint focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="gpu" className="text-xs font-medium text-foreground">
+                    GPU
+                  </label>
+                  <input
+                    id="gpu"
+                    value={gpu}
+                    onChange={(e) => setGpu(e.target.value)}
+                    placeholder="RTX 4090"
+                    className="mt-1 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-sm outline-none transition-colors duration-200 ease-out-quint focus:border-accent"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => publishProfile()}
+                  className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-4 py-2 text-sm font-semibold transition-transform duration-200 ease-out-quint hover:bg-surface-3 active:scale-[0.98]"
+                >
+                  <CheckCircle size={16} weight="bold" /> Guardar
+                </button>
+                <button
+                  onClick={() => publishProfile({ available: !available })}
+                  disabled={!streamUrl.trim() && !available}
+                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold text-white transition-transform duration-200 ease-out-quint active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
+                    available ? "bg-live hover:opacity-90" : "kntx-cta hover:brightness-110"
+                  }`}
+                >
+                  <Broadcast size={16} weight="fill" />
+                  {available ? "Dejar de transmitir" : "Marcar disponible"}
+                </button>
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+                  <Eye size={13} weight="fill" className="text-accent" /> se ve en{" "}
+                  <strong className="font-semibold text-foreground">Jugar</strong>
+                </span>
+              </div>
+            </Card>
 
             {/* My rigs */}
             <Card>

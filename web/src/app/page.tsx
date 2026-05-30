@@ -25,6 +25,7 @@ import {
   Eye,
   Heart,
   ShareNetwork,
+  Cpu,
 } from "@phosphor-icons/react";
 import { KntxMark } from "@/components/KntxMark";
 import { Rail } from "@/components/Rail";
@@ -34,6 +35,8 @@ import { MOCK, TRIAL_SECONDS, EXPLORER_TX } from "@/lib/ghostrig";
 import { CHAIN } from "@/lib/wagmi";
 import { DEMO_PRICE_PER_FPS } from "@/lib/useSession";
 import { useSessionLive } from "@/lib/useSessionLive";
+import { useRigs, type Rig } from "@/lib/useRigs";
+import { demoBus, type DemoHost } from "@/lib/demoBus";
 import { GameStream } from "./GameStream";
 
 const fmt = (wei: bigint, dp = 6) => Number(formatEther(wei)).toFixed(dp);
@@ -47,15 +50,38 @@ export default function Home() {
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
   const { state, open, close, reset } = useSessionLive();
+  const { rigs, loading: rigsLoading } = useRigs();
+  const [selectedRigId, setSelectedRigId] = useState<bigint | null>(null);
   const [deposit, setDeposit] = useState("0.05");
   const [showHelp, setShowHelp] = useState(false);
+
+  // Host stream profile published from the host dashboard (game / GPU / URL /
+  // availability). Syncs live across tabs via the demo bus.
+  const [hostProfile, setHostProfile] = useState<DemoHost | null>(null);
+  useEffect(() => {
+    setHostProfile(demoBus.get().host);
+    return demoBus.subscribe((s) => setHostProfile(s.host));
+  }, []);
+  const gameName = hostProfile?.game?.trim() || "Minecraft";
+  const gpuName = hostProfile?.gpu?.trim() || "RTX 4090";
+  const hostAvailable = hostProfile?.available ?? false;
+
+  // Default the selection to the first active rig (or the first one) once the list
+  // loads. The client can then switch rigs from the picker before depositing.
+  useEffect(() => {
+    if (selectedRigId !== null || rigs.length === 0) return;
+    setSelectedRigId((rigs.find((r) => r.active) ?? rigs[0]).id);
+  }, [rigs, selectedRigId]);
+
+  const selectedRig = rigs.find((r) => r.id === selectedRigId) ?? null;
 
   const injected = useMemo(
     () => connectors.find((c) => c.type === "injected") ?? connectors[0],
     [connectors],
   );
 
-  const pricePerMin = DEMO_PRICE_PER_FPS * 60n * 60n;
+  // Price shown reflects the SELECTED rig (falls back to the demo price while loading).
+  const pricePerMin = (selectedRig?.pricePerFps ?? DEMO_PRICE_PER_FPS) * 60n * 60n;
   const trial = state.phase === "trial";
   const live = state.phase === "billing";
   const inSession = trial || live;
@@ -69,8 +95,8 @@ export default function Home() {
     state.deposit > 0n ? Number((state.remaining * 1000n) / state.deposit) / 10 : 100;
 
   const startSession = useCallback(() => {
-    if (depositValid && !wrongNetwork) open(deposit);
-  }, [depositValid, wrongNetwork, open, deposit]);
+    if (depositValid && !wrongNetwork && selectedRigId !== null) open(deposit, selectedRigId);
+  }, [depositValid, wrongNetwork, open, deposit, selectedRigId]);
 
   // Keyboard accelerators: Esc ends a running session or closes help.
   useEffect(() => {
@@ -85,7 +111,7 @@ export default function Home() {
 
   // While playing, take over the screen: embedded game + floating payment HUD.
   if (inSession) {
-    return <GameStream state={state} onExit={close} />;
+    return <GameStream state={state} onExit={close} streamUrl={hostProfile?.streamUrl} />;
   }
 
   return (
@@ -214,14 +240,20 @@ export default function Home() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h1 className="truncate font-display text-base font-bold tracking-tight">
-                    Rig #1 · RTX 4090
+                    Rig #{selectedRig ? selectedRig.id.toString() : "—"} · {gpuName}
                   </h1>
-                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-live/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-live">
-                    <span className="kntx-pulse h-1.5 w-1.5 rounded-full bg-live" /> en vivo
-                  </span>
+                  {hostAvailable ? (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-online/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-online">
+                      <span className="kntx-pulse h-1.5 w-1.5 rounded-full bg-online" /> disponible
+                    </span>
+                  ) : (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                      <span className="h-1.5 w-1.5 rounded-full bg-muted" /> offline
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-                  <span className="text-accent">jugando Minecraft</span>
+                  <span className="text-accent">jugando {gameName}</span>
                   <span className="text-border">·</span>
                   <span className="font-mono tabular-nums">~{fmt(pricePerMin, 4)} MON/min @ 60 FPS</span>
                   <span className="text-border">·</span>
@@ -231,9 +263,6 @@ export default function Home() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="hidden items-center gap-1.5 rounded-full border border-online/30 bg-online/10 px-2.5 py-1 text-xs font-medium text-online sm:flex">
-                  <span className="kntx-pulse h-2 w-2 rounded-full bg-online" /> online · LAN
-                </span>
                 <button
                   aria-label="Seguir rig"
                   className="flex items-center gap-1.5 rounded-md bg-surface-2 px-3 py-1.5 text-xs font-semibold text-foreground transition-transform duration-200 ease-out-quint hover:bg-surface-3 active:scale-[0.97]"
@@ -279,6 +308,12 @@ export default function Home() {
                 </div>
               ) : showDepositForm ? (
                 <div className="rounded-xl border border-border bg-surface p-4">
+                  <RigPicker
+                    rigs={rigs}
+                    loading={rigsLoading}
+                    selectedId={selectedRigId}
+                    onSelect={setSelectedRigId}
+                  />
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="flex-1">
                       <label htmlFor="deposit" className="text-sm font-medium text-foreground">
@@ -322,7 +357,7 @@ export default function Home() {
                     <div className="flex flex-col gap-2 sm:w-52">
                       <button
                         onClick={startSession}
-                        disabled={!depositValid || wrongNetwork}
+                        disabled={!depositValid || wrongNetwork || selectedRigId === null}
                         className="kntx-cta flex items-center justify-center gap-2 rounded-md px-4 py-3.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Play size={18} weight="fill" /> Depositar y jugar
@@ -402,6 +437,78 @@ export default function Home() {
           <OnChainFeed ticks={state.ticks} />
         </div>
       </main>
+    </div>
+  );
+}
+
+function RigPicker({
+  rigs,
+  loading,
+  selectedId,
+  onSelect,
+}: {
+  rigs: Rig[];
+  loading: boolean;
+  selectedId: bigint | null;
+  onSelect: (id: bigint) => void;
+}) {
+  return (
+    <div className="mb-3 border-b border-border/60 pb-3">
+      <div className="mb-2 flex items-center gap-1.5">
+        <Cpu size={15} weight="bold" className="text-accent" />
+        <span className="text-sm font-medium text-foreground">Elegí un rig</span>
+        {!loading && rigs.length > 0 && (
+          <span className="ml-auto font-mono text-[11px] text-muted">
+            {rigs.length} disponible{rigs.length === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="px-1 py-2 text-xs text-muted">Cargando rigs on-chain…</p>
+      ) : rigs.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-muted">No hay rigs registrados todavía.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rigs.map((r) => {
+            const selected = selectedId === r.id;
+            const perMin = r.pricePerFps * 60n * 60n;
+            return (
+              <button
+                key={r.id.toString()}
+                onClick={() => onSelect(r.id)}
+                aria-pressed={selected}
+                className={`flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-transform duration-200 ease-out-quint active:scale-[0.99] ${
+                  selected
+                    ? "border-accent bg-accent/10"
+                    : "border-border bg-surface-2 hover:bg-surface-3"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${r.active ? "bg-online kntx-pulse" : "bg-muted"}`}
+                  title={r.active ? "online" : "offline"}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-foreground">
+                    Rig #{r.id.toString()}
+                    <span className="font-mono text-[11px] font-normal text-muted">
+                      {r.host.slice(0, 6)}…{r.host.slice(-4)}
+                    </span>
+                  </p>
+                  <p className="font-mono text-[11px] tabular-nums text-muted">
+                    ~{fmt(perMin, 4)} MON/min @ 60 FPS
+                  </p>
+                </div>
+                {selected && (
+                  <span className="shrink-0 rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+                    elegido
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

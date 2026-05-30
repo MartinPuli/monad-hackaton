@@ -46,24 +46,27 @@ const openGameWindow = (url: string) =>
 export function GameStream({
   state,
   onExit,
+  streamUrl: hostUrl,
 }: {
   state: SessionState;
   onExit: () => void;
+  streamUrl?: string; // URL published by the host (takes precedence)
 }) {
   const trial = state.phase === "trial";
 
-  // Stream URL: localStorage (host-set) → env default. Editable from the UI.
+  // Stream URL priority: host-published (demo bus) → localStorage → env default.
+  // Still editable from the UI if the host hasn't set one.
   const [streamUrl, setStreamUrl] = useState("");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    const url = saved ?? ENV_STREAM_URL;
+    const url = (hostUrl && hostUrl.trim()) || saved || ENV_STREAM_URL;
     setStreamUrl(url);
     setDraft(url);
     if (!url) setEditing(true); // prompt for it if we have none
-  }, []);
+  }, [hostUrl]);
 
   const windowMode = mustOpenInWindow(streamUrl);
 
