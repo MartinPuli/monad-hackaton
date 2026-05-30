@@ -18,6 +18,12 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 
+# Vendored upstream repo (cloned for reference, not part of our codebase)
+sunshine/
+
+# Playwright MCP scratch
+.playwright-mcp/
+
 # OS / editor
 .DS_Store
 Thumbs.db

@@ -1,0 +1,14 @@
+{
+  "name": "ghostrig-host-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GhostRig host agent: measures FPS and reports it on-chain every second (Monad).",
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node src/register-rig.js"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  }
+}
