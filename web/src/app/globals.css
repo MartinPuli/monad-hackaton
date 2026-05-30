@@ -1,19 +1,21 @@
 @import "tailwindcss";
 
-/* GhostRig — Twitch-inspired, tinted-dark product theme (see DESIGN.md).
-   OKLCH neutrals tinted toward the brand hue (~293). Never pure #000/#fff. */
+/* GhostRig — Monad-inspired theme (see DESIGN.md).
+   Adapted from monad.xyz: deep indigo-black surfaces (Monad Blue #200052 /
+   Monad Black #0E100F), Monad Purple #836EF9 accent, off-white #FBFAF9 text.
+   OKLCH, tinted toward the brand hue (~286). Never pure #000/#fff. */
 :root {
-  --background: oklch(0.165 0.012 293);
-  --surface: oklch(0.205 0.014 293);
-  --surface-2: oklch(0.245 0.014 293);
-  --surface-3: oklch(0.285 0.014 293);
-  --border: oklch(0.305 0.012 293);
-  --foreground: oklch(0.965 0.004 293);
-  --muted: oklch(0.715 0.012 293);
-  --accent: oklch(0.585 0.215 293);
-  --accent-hover: oklch(0.66 0.2 293);
-  --live: oklch(0.6 0.2 25);
-  --online: oklch(0.8 0.16 158);
+  --background: oklch(0.16 0.022 288);
+  --surface: oklch(0.205 0.03 286);
+  --surface-2: oklch(0.245 0.034 286);
+  --surface-3: oklch(0.29 0.036 286);
+  --border: oklch(0.32 0.03 286);
+  --foreground: oklch(0.97 0.004 286);
+  --muted: oklch(0.72 0.02 286);
+  --accent: oklch(0.66 0.17 282);
+  --accent-hover: oklch(0.72 0.15 282);
+  --live: oklch(0.62 0.2 22);
+  --online: oklch(0.82 0.16 160);
 }
 
 @theme inline {

@@ -1,31 +1,35 @@
 # DESIGN.md — GhostRig
 
 Register: **product**. Color strategy: **Restrained** — tinted-dark neutrals + one committed
-brand accent (Twitch purple). Theme: **dark**.
+brand accent (Monad Purple). Theme: **dark**. Adaptado de **monad.xyz**.
 
 > Scene sentence (why dark): un jugador de noche, frente a su PC, en una consola de streaming
-> tipo Twitch, mirando su juego y su saldo moverse en vivo. La pantalla oscura es el contexto
-> nativo del producto, no una elección "porque las tools quedan cool oscuras".
+> sobre la estética de Monad (índigo profundo + morado), mirando su juego y su saldo moverse en
+> vivo. La pantalla oscura es el contexto nativo del producto, no una elección "porque queda cool".
 
-## Color (OKLCH, tinted toward the brand hue ~293)
-Never `#000`/`#fff`. Every neutral carries a faint purple tint.
+## Marca Monad (referencia)
+Monad Purple `#836EF9` · Monad Blue `#200052` · Monad Black `#0E100F` · Off-White `#FBFAF9` ·
+Berry `#A0055D`.
+
+## Color (OKLCH, tinted toward the brand hue ~286)
+Never `#000`/`#fff`. Neutrales índigo (Monad Blue/Black); acento periwinkle (Monad Purple).
 
 | Token | OKLCH | Uso |
 |---|---|---|
-| `--background` | `oklch(0.165 0.012 293)` | fondo de la app |
-| `--surface` | `oklch(0.205 0.014 293)` | paneles, nav |
-| `--surface-2` | `oklch(0.245 0.014 293)` | inputs, chips |
-| `--surface-3` | `oklch(0.285 0.014 293)` | hover de superficies |
-| `--border` | `oklch(0.305 0.012 293)` | divisores 1px |
-| `--foreground` | `oklch(0.965 0.004 293)` | texto principal |
-| `--muted` | `oklch(0.715 0.012 293)` | texto secundario, labels |
-| `--accent` (Twitch) | `oklch(0.585 0.215 293)` | acento de marca, CTA |
-| `--accent-hover` | `oklch(0.66 0.20 293)` | hover del acento |
-| `--live` | `oklch(0.60 0.20 25)` | estado cobrando (rojo LIVE) |
-| `--online` | `oklch(0.80 0.16 158)` | online / trial / saldo OK |
+| `--background` | `oklch(0.16 0.022 288)` | fondo de la app (índigo profundo) |
+| `--surface` | `oklch(0.205 0.03 286)` | paneles, nav |
+| `--surface-2` | `oklch(0.245 0.034 286)` | inputs, chips |
+| `--surface-3` | `oklch(0.29 0.036 286)` | hover de superficies |
+| `--border` | `oklch(0.32 0.03 286)` | divisores 1px |
+| `--foreground` | `oklch(0.97 0.004 286)` | texto (off-white) |
+| `--muted` | `oklch(0.72 0.02 286)` | texto secundario, labels |
+| `--accent` (Monad Purple) | `oklch(0.66 0.17 282)` | acento de marca, CTA |
+| `--accent-hover` | `oklch(0.72 0.15 282)` | hover del acento |
+| `--live` | `oklch(0.62 0.20 22)` | estado cobrando (rojo LIVE) |
+| `--online` | `oklch(0.82 0.16 160)` | online / trial / saldo OK |
 
 Reglas:
-- El acento Twitch es **committed pero contenido**: CTA principal, marca, links. No glow, no
+- El acento Monad es **committed pero contenido**: CTA principal, marca, links. No glow, no
   gradiente de texto, no fondos morados brillantes.
 - Rojo = solo "LIVE / cobrando". Verde = solo "online / gratis / saldo sano". No decorativos.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useAccount,
   useConnect,
@@ -21,6 +21,8 @@ import {
   ArrowSquareOut,
   WarningCircle,
   CircleNotch,
+  Info,
+  Keyboard,
 } from "@phosphor-icons/react";
 import { MOCK, TRIAL_SECONDS, EXPLORER_TX } from "@/lib/ghostrig";
 import { CHAIN } from "@/lib/wagmi";
@@ -37,6 +39,7 @@ export default function Home() {
   const { switchChain, isPending: switching } = useSwitchChain();
   const { state, open, close, reset } = useSession();
   const [deposit, setDeposit] = useState("0.05");
+  const [showHelp, setShowHelp] = useState(false);
 
   const injected = useMemo(
     () => connectors.find((c) => c.type === "injected") ?? connectors[0],
@@ -46,6 +49,7 @@ export default function Home() {
   const pricePerMin = DEMO_PRICE_PER_FPS * 60n * 60n;
   const trial = state.phase === "trial";
   const live = state.phase === "billing";
+  const inSession = trial || live;
   const showDepositForm = isConnected && state.phase === "idle";
   const wrongNetwork = isConnected && chainId !== CHAIN.id;
 
@@ -54,6 +58,21 @@ export default function Home() {
   const depositError = deposit.trim() !== "" && !depositValid;
   const pct =
     state.deposit > 0n ? Number((state.remaining * 1000n) / state.deposit) / 10 : 100;
+
+  const startSession = useCallback(() => {
+    if (depositValid && !wrongNetwork) open(deposit);
+  }, [depositValid, wrongNetwork, open, deposit]);
+
+  // Keyboard accelerators: Esc ends a running session or closes help.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showHelp) setShowHelp(false);
+      else if (inSession) close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inSession, showHelp, close]);
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -67,7 +86,16 @@ export default function Home() {
             rentá FPS, pagás en vivo sobre Monad
           </span>
         </div>
-        {isConnected ? (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowHelp(true)}
+            aria-label="Cómo funciona"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-sm text-muted transition-transform duration-200 ease-out-quint hover:bg-surface-3 hover:text-foreground active:scale-[0.98]"
+          >
+            <Info size={18} weight="bold" />
+            <span className="hidden sm:inline">Cómo funciona</span>
+          </button>
+          {isConnected ? (
           <button
             onClick={() => disconnect()}
             className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 font-mono text-sm font-medium tabular-nums transition-transform duration-200 ease-out-quint hover:bg-surface-3 active:scale-[0.98]"
@@ -88,8 +116,11 @@ export default function Home() {
             )}
             {isPending ? "Conectando" : "Conectar wallet"}
           </button>
-        )}
+          )}
+        </div>
       </nav>
+
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-6 md:px-5">
         {MOCK && (
@@ -122,10 +153,10 @@ export default function Home() {
 
         <div className="grid gap-4 lg:grid-cols-[1fr_336px]">
           <section className="flex flex-col gap-3">
-            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-border bg-[oklch(0.13_0.01_293)]">
+            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-border bg-[oklch(0.12_0.02_288)]">
               <StreamView phase={state.phase} fps={state.fps} />
               {trial && (
-                <Badge className="left-3 top-3 bg-online text-[oklch(0.18_0.02_158)]">
+                <Badge className="left-3 top-3 bg-online text-[oklch(0.2_0.03_160)]">
                   <span className="ghost-pulse h-1.5 w-1.5 rounded-full bg-current" />
                   PRUEBA GRATIS · {state.trialRemaining}s
                 </Badge>
@@ -176,12 +207,13 @@ export default function Home() {
                   state.ticks.map((t, i) => (
                     <div
                       key={t.second}
+                      title="Cada segundo el host registra los FPS reales y la deuda se acumula on-chain."
                       className={`flex items-center justify-between gap-2 px-4 py-1.5 tabular-nums ${i === 0 ? "ghost-tick-in" : ""}`}
                     >
                       <span className="w-9 shrink-0 text-muted">s{t.second}</span>
                       <span className="w-14 text-accent">{t.fps} fps</span>
                       <span className={`flex-1 ${t.trial ? "text-online" : "text-foreground"}`}>
-                        {t.trial ? "trial · sin cargo" : `deuda ${fmt(t.accrued)}`}
+                        {t.trial ? "gratis" : `−${fmt(t.accrued)} MON`}
                       </span>
                       <a
                         href={`${EXPLORER_TX}${t.txHash}`}
@@ -226,6 +258,7 @@ export default function Home() {
                     step="0.01"
                     value={deposit}
                     onChange={(e) => setDeposit(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && startSession()}
                     aria-invalid={depositError}
                     className="w-full bg-transparent px-3 py-2 font-mono text-sm tabular-nums outline-none"
                   />
@@ -252,15 +285,17 @@ export default function Home() {
                   </p>
                 )}
                 <button
-                  onClick={() => open(deposit)}
+                  onClick={startSession}
                   disabled={!depositValid || wrongNetwork}
                   className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-3 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Play size={18} weight="fill" /> Depositar y jugar
                 </button>
-                <p className="text-xs text-muted">
-                  Los primeros {TRIAL_SECONDS}s son gratis. No se cobra nada hasta que confirmes
-                  que el stream anda.
+                <p className="flex items-center justify-between text-xs text-muted">
+                  <span>Primeros {TRIAL_SECONDS}s gratis. No se cobra hasta que confirmes.</span>
+                  <kbd className="rounded border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
+                    Enter
+                  </kbd>
                 </p>
               </div>
             ) : (
@@ -292,12 +327,15 @@ export default function Home() {
                   </div>
                 </div>
 
-                {(trial || live) && (
+                {inSession && (
                   <button
                     onClick={close}
                     className="flex items-center justify-center gap-2 rounded-md bg-live px-4 py-3 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:opacity-90 active:scale-[0.98]"
                   >
                     <Stop size={18} weight="fill" /> Terminar sesión
+                    <kbd className="rounded border border-white/30 px-1.5 py-0.5 font-mono text-[10px] font-normal">
+                      Esc
+                    </kbd>
                   </button>
                 )}
 
@@ -364,6 +402,59 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       <span className={`font-mono font-semibold tabular-nums ${accent ?? "text-foreground"}`}>
         {value}
       </span>
+    </div>
+  );
+}
+
+const HELP_STEPS = [
+  ["Depositás saldo", "Cargás MON en el contrato. Queda en escrow, nadie lo toca hasta que jugás."],
+  [`${TRIAL_SECONDS}s gratis`, "Probás el stream sin cargo. Si no anda o es trucho, te vas sin pagar."],
+  ["Pagás por FPS", "Cada segundo el host reporta los FPS reales y la deuda se acumula on-chain."],
+  ["Cerrás cuando querés", "Se le paga al host lo usado y se te reembolsa el resto, al instante."],
+] as const;
+
+function HelpPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-30 flex items-start justify-center bg-black/50 px-4 pt-20 backdrop-blur-sm"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Cómo funciona GhostRig"
+        className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-2xl"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold tracking-tight">Cómo funciona</h2>
+          <button
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm text-muted transition-colors hover:text-foreground"
+          >
+            Cerrar
+          </button>
+        </div>
+        <ol className="mt-3 divide-y divide-border/60">
+          {HELP_STEPS.map(([title, body], i) => (
+            <li key={title} className="flex gap-3 py-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 font-mono text-xs font-bold text-accent">
+                {i + 1}
+              </span>
+              <div>
+                <p className="text-sm font-semibold">{title}</p>
+                <p className="text-xs text-muted">{body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-2 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted">
+          <Keyboard size={16} weight="bold" />
+          <span>
+            Atajos: <kbd className="font-mono text-foreground">Enter</kbd> deposita,{" "}
+            <kbd className="font-mono text-foreground">Esc</kbd> termina la sesión.
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

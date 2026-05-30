@@ -24,9 +24,10 @@ real y funciona ahora", no "una startup más". Cercano al lenguaje de streaming/
 (LIVE, online, viewers) sin caer en gamer-edgy de luces neón.
 
 ## Brand identity
-Inspiración visual **Twitch** (decisión explícita del usuario): morado de marca como acento
-único y deliberado, fondos oscuros tipo consola de streaming, badges LIVE. No es el reflejo
-"crypto neón sobre negro": es la estética sobria de una plataforma de streaming madura.
+Inspiración visual **Monad** (monad.xyz): tema oscuro índigo profundo (Monad Blue #200052 /
+Monad Black #0E100F), **Monad Purple #836EF9** como acento único, texto off-white #FBFAF9.
+Hereda el lenguaje de streaming (badges LIVE/online) pero sobre la identidad de Monad —
+refuerza el "construido sobre Monad" y evita el reflejo "crypto neón sobre negro".
 
 ## Anti-references
 - Dashboards SaaS genéricos (cards iguales en grilla de 3, hero-metric con número gigante).
