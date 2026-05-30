@@ -15,6 +15,13 @@ export const EXPLORER_TX = "https://monad-testnet.socialscan.io/tx/";
 /** True until Dev A's contract is deployed and the address is configured. */
 export const MOCK = !GHOSTRIG_ADDRESS;
 
+// ABI matches the DEPLOYED & VERIFIED contract (0x2F9e...172b9a). Source of truth:
+// web/abi/GhostRig.json. Notes for wiring page.tsx in live mode:
+//   - reads use the auto-generated getters `sessions(id)` and `rigs(id)` (NOT getSession/getRig)
+//   - `sessions(id)` returns: client, rigId, deposit, accrued, pricePerFps, startTime, open
+//   - `rigs(id)` returns: host, pricePerFps, active
+//   - after closeSession, each party calls `withdraw()` to pull their funds (pull-payment)
+//   - there is no clientTimeout; closing is closeSession (callable by client or host)
 export const ghostRigAbi = [
   // --- host ---
   {
@@ -26,13 +33,33 @@ export const ghostRigAbi = [
   },
   {
     type: "function",
+    name: "setPrice",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "rigId", type: "uint256" },
+      { name: "pricePerFps", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setActive",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "rigId", type: "uint256" },
+      { name: "active", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "reportFps",
     stateMutability: "nonpayable",
     inputs: [
       { name: "sessionId", type: "uint256" },
       { name: "fps", type: "uint256" },
     ],
-    outputs: [],
+    outputs: [{ name: "exhausted", type: "bool" }],
   },
   // --- client ---
   {
@@ -49,39 +76,61 @@ export const ghostRigAbi = [
     inputs: [{ name: "sessionId", type: "uint256" }],
     outputs: [],
   },
+  // --- pull-payment ---
   {
     type: "function",
-    name: "clientTimeout",
+    name: "withdraw",
     stateMutability: "nonpayable",
-    inputs: [{ name: "sessionId", type: "uint256" }],
+    inputs: [],
     outputs: [],
   },
-  // --- views ---
   {
     type: "function",
-    name: "getSession",
+    name: "pendingWithdrawals",
     stateMutability: "view",
-    inputs: [{ name: "sessionId", type: "uint256" }],
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  // --- views (auto-generated getters) ---
+  {
+    type: "function",
+    name: "sessions",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "uint256" }],
     outputs: [
       { name: "client", type: "address" },
       { name: "rigId", type: "uint256" },
       { name: "deposit", type: "uint256" },
       { name: "accrued", type: "uint256" },
+      { name: "pricePerFps", type: "uint256" },
       { name: "startTime", type: "uint256" },
-      { name: "lastReport", type: "uint256" },
       { name: "open", type: "bool" },
     ],
   },
   {
     type: "function",
-    name: "getRig",
+    name: "rigs",
     stateMutability: "view",
-    inputs: [{ name: "rigId", type: "uint256" }],
+    inputs: [{ name: "", type: "uint256" }],
     outputs: [
       { name: "host", type: "address" },
       { name: "pricePerFps", type: "uint256" },
       { name: "active", type: "bool" },
     ],
+  },
+  {
+    type: "function",
+    name: "isBillable",
+    stateMutability: "view",
+    inputs: [{ name: "sessionId", type: "uint256" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "TRIAL_SECONDS",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
   },
   // --- events ---
   {
@@ -118,7 +167,7 @@ export const ghostRigAbi = [
     inputs: [
       { name: "sessionId", type: "uint256", indexed: true },
       { name: "paidToHost", type: "uint256", indexed: false },
-      { name: "refundToClient", type: "uint256", indexed: false },
+      { name: "refundedToClient", type: "uint256", indexed: false },
     ],
   },
 ] as const satisfies Abi;
