@@ -102,18 +102,22 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 ---
 
-## WB5 — Frontend / Cliente 🔴
+## WB5 — Frontend / Cliente 🔴 (Dev B) — UI lista en MOCK, falta wiring real
 **Objetivo:** la app donde el jugador conecta wallet, deposita y juega.
 
-- [ ] App con **Next.js + viem/wagmi**, chain `monadTestnet` de `viem/chains`.
-- [ ] Conectar wallet (MetaMask con red Monad testnet).
-- [ ] Pantalla: elegir rig (el de tu amigo) → depositar saldo → `openSession()`.
-- [ ] Vista de juego: recibe el stream (Minecraft vía Moonlight, o el simulado) + captura inputs.
-- [ ] **Trial visible:** contador verde "prueba gratis 10 s" antes de cobrar.
-- [ ] **Deuda en vivo:** escuchar eventos `FpsReported` y mostrar FPS del momento + deuda subiendo / saldo bajando en tiempo real.
-- [ ] Botón "Terminar sesión" → `closeSession()` + mostrar reembolso.
+- [x] App con **Next.js 16 + wagmi 3/viem 2**, chain `monadTestnet` de `viem/chains`.
+- [x] Conectar wallet (injected / MetaMask con red Monad testnet).
+- [x] Pantalla: rig → depositar saldo → `openSession()` (mock).
+- [~] Vista de juego: placeholder de FPS en vivo (el stream real de Minecraft llega por Moonlight, fuera de la web — WB6/WB7).
+- [x] **Trial visible:** contador verde "prueba gratis 10 s" antes de cobrar.
+- [x] **Deuda en vivo:** log de eventos `FpsReported` (mock 1/seg) + FPS + deuda subiendo / saldo bajando.
+- [x] Botón "Terminar sesión" → `closeSession()` + reembolso (mock).
+- [ ] **Wiring al contrato real** (depende del address de WB3 de Dev A). Ver `web/README.md`.
 
-**Entregable:** flujo completo cliente jugable end-to-end.
+**Estado:** corre en `web/`, `npm run dev` → :3000. Build y typecheck en verde. Banner "MOCK MODE"
+hasta que se configure `NEXT_PUBLIC_GHOSTRIG_ADDRESS`. ABI acordada en `interface.md`.
+
+**Entregable:** ✅ flujo cliente jugable end-to-end (en mock); pendiente conectar al contrato real.
 
 ---
 
