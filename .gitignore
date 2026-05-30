@@ -4,6 +4,9 @@
 !.env.example
 *.key
 
+# Third-party design skill (kept local, not project code)
+.claude/skills/impeccable/
+
 # Node
 node_modules/
 .next/

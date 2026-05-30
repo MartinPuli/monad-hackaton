@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
-/* GhostRig — Twitch-inspired dark theme */
+/* GhostRig — Twitch-inspired, tinted-dark product theme (see DESIGN.md).
+   OKLCH neutrals tinted toward the brand hue (~293). Never pure #000/#fff. */
 :root {
-  --background: #0e0e10;
-  --surface: #18181b;
-  --surface-2: #1f1f23;
-  --surface-3: #26262c;
-  --border: #2f2f35;
-  --foreground: #efeff1;
-  --muted: #adadb8;
-  --twitch: #9146ff;
-  --twitch-hover: #a970ff;
-  --live: #eb0400;
-  --online: #00f593;
+  --background: oklch(0.165 0.012 293);
+  --surface: oklch(0.205 0.014 293);
+  --surface-2: oklch(0.245 0.014 293);
+  --surface-3: oklch(0.285 0.014 293);
+  --border: oklch(0.305 0.012 293);
+  --foreground: oklch(0.965 0.004 293);
+  --muted: oklch(0.715 0.012 293);
+  --accent: oklch(0.585 0.215 293);
+  --accent-hover: oklch(0.66 0.2 293);
+  --live: oklch(0.6 0.2 25);
+  --online: oklch(0.8 0.16 158);
 }
 
 @theme inline {
@@ -23,12 +24,13 @@
   --color-border: var(--border);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
-  --color-twitch: var(--twitch);
-  --color-twitch-hover: var(--twitch-hover);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-live: var(--live);
   --color-online: var(--online);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 body {
@@ -37,8 +39,30 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Thin Twitch-style scrollbars */
+/* Thin scrollbars, tinted to the surface */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--surface-3) transparent;
+}
+
+/* Live status dot — soft breathing pulse (transform/opacity only) */
+@keyframes ghost-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+.ghost-pulse {
+  animation: ghost-pulse 1.8s var(--ease-out-quint) infinite;
+}
+
+/* Event-row enter — subtle slide+fade for the newest reportFps tick */
+@keyframes ghost-tick-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ghost-tick-in {
+  animation: ghost-tick-in 0.28s var(--ease-out-quint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost-pulse, .ghost-tick-in { animation: none; }
 }
