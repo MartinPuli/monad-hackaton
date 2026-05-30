@@ -1,26 +1,44 @@
 @import "tailwindcss";
 
+/* GhostRig — Twitch-inspired dark theme */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0e0e10;
+  --surface: #18181b;
+  --surface-2: #1f1f23;
+  --surface-3: #26262c;
+  --border: #2f2f35;
+  --foreground: #efeff1;
+  --muted: #adadb8;
+  --twitch: #9146ff;
+  --twitch-hover: #a970ff;
+  --live: #eb0400;
+  --online: #00f593;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-twitch: var(--twitch);
+  --color-twitch-hover: var(--twitch-hover);
+  --color-live: var(--live);
+  --color-online: var(--online);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Thin Twitch-style scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
 }
