@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useChainId,
+  useSwitchChain,
+} from "wagmi";
 import { formatEther } from "viem";
 import {
   Ghost,
@@ -12,16 +18,23 @@ import {
   Lightning,
   Receipt,
   ShieldCheck,
+  ArrowSquareOut,
+  WarningCircle,
+  CircleNotch,
 } from "@phosphor-icons/react";
-import { MOCK, TRIAL_SECONDS } from "@/lib/ghostrig";
+import { MOCK, TRIAL_SECONDS, EXPLORER_TX } from "@/lib/ghostrig";
+import { CHAIN } from "@/lib/wagmi";
 import { useSession, DEMO_PRICE_PER_FPS } from "@/lib/useSession";
 
 const fmt = (wei: bigint, dp = 6) => Number(formatEther(wei)).toFixed(dp);
+const QUICK_AMOUNTS = ["0.05", "0.1", "0.5"];
 
 export default function Home() {
   const { isConnected, address } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
+  const { switchChain, isPending: switching } = useSwitchChain();
   const { state, open, close, reset } = useSession();
   const [deposit, setDeposit] = useState("0.05");
 
@@ -31,15 +44,19 @@ export default function Home() {
   );
 
   const pricePerMin = DEMO_PRICE_PER_FPS * 60n * 60n;
-  const canPlay = state.phase === "idle" || state.phase === "closed";
-  const live = state.phase === "billing";
   const trial = state.phase === "trial";
+  const live = state.phase === "billing";
+  const showDepositForm = isConnected && state.phase === "idle";
+  const wrongNetwork = isConnected && chainId !== CHAIN.id;
+
+  const depositNum = Number(deposit);
+  const depositValid = Number.isFinite(depositNum) && depositNum > 0;
+  const depositError = deposit.trim() !== "" && !depositValid;
   const pct =
     state.deposit > 0n ? Number((state.remaining * 1000n) / state.deposit) / 10 : 100;
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      {/* Nav */}
       <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/95 px-5 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2.5">
           <Ghost size={24} weight="fill" className="text-accent" />
@@ -53,7 +70,7 @@ export default function Home() {
         {isConnected ? (
           <button
             onClick={() => disconnect()}
-            className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 font-mono text-sm font-medium tabular-nums transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-surface-3 active:scale-[0.98]"
+            className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 font-mono text-sm font-medium tabular-nums transition-transform duration-200 ease-out-quint hover:bg-surface-3 active:scale-[0.98]"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-online" />
             {address?.slice(0, 6)}…{address?.slice(-4)}
@@ -62,9 +79,13 @@ export default function Home() {
           <button
             onClick={() => injected && connect({ connector: injected })}
             disabled={isPending || !injected}
-            className="flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-sm font-bold text-white transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md bg-accent px-4 py-1.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50"
           >
-            <Wallet size={18} weight="bold" />
+            {isPending ? (
+              <CircleNotch size={18} weight="bold" className="animate-spin" />
+            ) : (
+              <Wallet size={18} weight="bold" />
+            )}
             {isPending ? "Conectando" : "Conectar wallet"}
           </button>
         )}
@@ -83,12 +104,26 @@ export default function Home() {
           </div>
         )}
 
+        {wrongNetwork && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-live/40 bg-live/10 px-4 py-2.5 text-sm">
+            <WarningCircle size={18} weight="fill" className="shrink-0 text-live" />
+            <span className="flex-1">
+              Estás en otra red. GhostRig corre sobre <strong>Monad testnet</strong>.
+            </span>
+            <button
+              onClick={() => switchChain({ chainId: CHAIN.id })}
+              disabled={switching}
+              className="rounded-md bg-live px-3 py-1.5 text-xs font-bold text-white transition-transform duration-200 ease-out-quint hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+            >
+              {switching ? "Cambiando…" : "Cambiar a Monad"}
+            </button>
+          </div>
+        )}
+
         <div className="grid gap-4 lg:grid-cols-[1fr_336px]">
-          {/* Stream + events */}
           <section className="flex flex-col gap-3">
             <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-border bg-[oklch(0.13_0.01_293)]">
               <StreamView phase={state.phase} fps={state.fps} />
-
               {trial && (
                 <Badge className="left-3 top-3 bg-online text-[oklch(0.18_0.02_158)]">
                   <span className="ghost-pulse h-1.5 w-1.5 rounded-full bg-current" />
@@ -108,7 +143,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* Channel header */}
             <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent font-bold text-white">
                 R
@@ -124,14 +158,13 @@ export default function Home() {
               </span>
             </div>
 
-            {/* reportFps event stream */}
             <div className="overflow-hidden rounded-lg border border-border bg-surface">
               <div className="flex items-center justify-between border-b border-border px-4 py-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted">
                   Monad · liquidación en vivo
                 </span>
                 <span className="font-mono text-xs tabular-nums text-muted">
-                  {state.ticks.length} eventos
+                  {state.ticks.length} tx
                 </span>
               </div>
               <div className="max-h-52 divide-y divide-border/60 overflow-y-auto font-mono text-xs">
@@ -145,14 +178,21 @@ export default function Home() {
                       key={t.second}
                       className={`flex items-center justify-between gap-2 px-4 py-1.5 tabular-nums ${i === 0 ? "ghost-tick-in" : ""}`}
                     >
-                      <span className="w-10 shrink-0 text-muted">s{t.second}</span>
-                      <span className="w-16 text-accent">{t.fps} fps</span>
+                      <span className="w-9 shrink-0 text-muted">s{t.second}</span>
+                      <span className="w-14 text-accent">{t.fps} fps</span>
                       <span className={`flex-1 ${t.trial ? "text-online" : "text-foreground"}`}>
                         {t.trial ? "trial · sin cargo" : `deuda ${fmt(t.accrued)}`}
                       </span>
-                      <span className="shrink-0 truncate text-muted" title={t.txHash}>
-                        {t.txHash.slice(0, 10)}
-                      </span>
+                      <a
+                        href={`${EXPLORER_TX}${t.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={MOCK ? "hash simulado (modo demo)" : "ver tx en Monad explorer"}
+                        className="flex shrink-0 items-center gap-1 text-muted transition-colors hover:text-accent"
+                      >
+                        {t.txHash.slice(0, 8)}
+                        <ArrowSquareOut size={12} weight="bold" />
+                      </a>
                     </div>
                   ))
                 )}
@@ -160,44 +200,25 @@ export default function Home() {
             </div>
           </section>
 
-          {/* Billing / control */}
           <aside className="flex flex-col gap-3">
-            <div className="rounded-lg border border-border bg-surface">
-              <div className="px-4 pt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                  Saldo restante
-                </p>
-                <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-online">
-                  {fmt(state.remaining, 5)}
-                  <span className="ml-1 text-base font-medium text-muted">MON</span>
-                </p>
-                {/* depletion bar */}
-                <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-2">
-                  <div
-                    className="h-full rounded-full bg-online transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-              <div className="mt-3 divide-y divide-border/60 px-4 pb-2 text-sm">
-                <Stat label="Depósito" value={`${fmt(state.deposit)} MON`} />
-                <Stat label="Deuda acumulada" value={`${fmt(state.accrued)} MON`} accent="text-live" />
-                <Stat label="FPS ahora" value={live || trial ? `${state.fps}` : "—"} />
-                <Stat label="Tiempo" value={`${state.elapsed}s`} />
-              </div>
-            </div>
-
             {!isConnected ? (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface px-4 py-6 text-center">
-                <ShieldCheck size={24} weight="regular" className="text-muted" />
+              <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface px-4 py-8 text-center">
+                <ShieldCheck size={26} weight="regular" className="text-muted" />
                 <p className="text-sm text-muted">Conectá tu wallet para abrir una sesión.</p>
               </div>
-            ) : canPlay ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-                <label htmlFor="deposit" className="text-sm font-medium text-foreground">
-                  Depósito
-                </label>
-                <div className="flex items-center rounded-md border border-border bg-surface-2 focus-within:border-accent">
+            ) : showDepositForm ? (
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+                <div>
+                  <label htmlFor="deposit" className="text-sm font-medium text-foreground">
+                    Depósito
+                  </label>
+                  <p className="mt-0.5 text-xs text-muted">
+                    Se descuenta a medida que jugás: fps × precio por segundo.
+                  </p>
+                </div>
+                <div
+                  className={`flex items-center rounded-md border bg-surface-2 ${depositError ? "border-live" : "border-border focus-within:border-accent"}`}
+                >
                   <input
                     id="deposit"
                     type="number"
@@ -205,13 +226,35 @@ export default function Home() {
                     step="0.01"
                     value={deposit}
                     onChange={(e) => setDeposit(e.target.value)}
+                    aria-invalid={depositError}
                     className="w-full bg-transparent px-3 py-2 font-mono text-sm tabular-nums outline-none"
                   />
                   <span className="px-3 text-sm font-medium text-muted">MON</span>
                 </div>
+                <div className="flex gap-2">
+                  {QUICK_AMOUNTS.map((a) => (
+                    <button
+                      key={a}
+                      onClick={() => setDeposit(a)}
+                      className={`flex-1 rounded-md border px-2 py-1.5 font-mono text-xs tabular-nums transition-transform duration-200 ease-out-quint active:scale-[0.97] ${
+                        deposit === a
+                          ? "border-accent bg-accent/15 text-foreground"
+                          : "border-border bg-surface-2 text-muted hover:bg-surface-3"
+                      }`}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
+                {depositError && (
+                  <p className="flex items-center gap-1.5 text-xs text-live">
+                    <WarningCircle size={14} weight="fill" /> Ingresá un monto mayor a 0.
+                  </p>
+                )}
                 <button
                   onClick={() => open(deposit)}
-                  className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-3 text-sm font-bold text-white transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-accent-hover active:scale-[0.98]"
+                  disabled={!depositValid || wrongNetwork}
+                  className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent px-4 py-3 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Play size={18} weight="fill" /> Depositar y jugar
                 </button>
@@ -221,31 +264,62 @@ export default function Home() {
                 </p>
               </div>
             ) : (
-              <button
-                onClick={close}
-                className="flex items-center justify-center gap-2 rounded-md bg-live px-4 py-3 text-sm font-bold text-white transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:opacity-90 active:scale-[0.98]"
-              >
-                <Stop size={18} weight="fill" /> Terminar sesión
-              </button>
-            )}
+              <>
+                <div className="rounded-lg border border-border bg-surface">
+                  <div className="px-4 pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Saldo restante
+                    </p>
+                    <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-online">
+                      {fmt(state.remaining, 5)}
+                      <span className="ml-1 text-base font-medium text-muted">MON</span>
+                    </p>
+                    <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-2">
+                      <div
+                        className="h-full rounded-full bg-online transition-[width] duration-500 ease-out-quint"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 divide-y divide-border/60 px-4 pb-2 text-sm">
+                    <Stat label="Depósito" value={`${fmt(state.deposit)} MON`} />
+                    <Stat
+                      label="Deuda acumulada"
+                      value={`${fmt(state.accrued)} MON`}
+                      accent="text-live"
+                    />
+                    <Stat label="Tiempo" value={`${state.elapsed}s`} />
+                  </div>
+                </div>
 
-            {state.phase === "closed" && state.deposit > 0n && (
-              <div className="rounded-lg border border-online/30 bg-online/10 p-4">
-                <div className="flex items-center gap-2">
-                  <Receipt size={18} weight="bold" className="text-online" />
-                  <p className="text-sm font-semibold text-online">Sesión liquidada</p>
-                </div>
-                <div className="mt-2 divide-y divide-border/60 text-sm">
-                  <Stat label="Pagado al host" value={`${fmt(state.paidToHost)} MON`} />
-                  <Stat label="Reembolsado" value={`${fmt(state.refund)} MON`} />
-                </div>
-                <button
-                  onClick={reset}
-                  className="mt-3 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-xs font-semibold transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-surface-3 active:scale-[0.98]"
-                >
-                  Nueva sesión
-                </button>
-              </div>
+                {(trial || live) && (
+                  <button
+                    onClick={close}
+                    className="flex items-center justify-center gap-2 rounded-md bg-live px-4 py-3 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:opacity-90 active:scale-[0.98]"
+                  >
+                    <Stop size={18} weight="fill" /> Terminar sesión
+                  </button>
+                )}
+
+                {state.phase === "closed" && (
+                  <div className="rounded-lg border border-online/30 bg-online/10 p-4">
+                    <div className="flex items-center gap-2">
+                      <Receipt size={18} weight="bold" className="text-online" />
+                      <p className="text-sm font-semibold text-online">Sesión liquidada</p>
+                    </div>
+                    <div className="mt-2 divide-y divide-border/60 text-sm">
+                      <Stat label="Pagado al host" value={`${fmt(state.paidToHost)} MON`} />
+                      <Stat label="Reembolsado" value={`${fmt(state.refund)} MON`} />
+                    </div>
+                    <button
+                      onClick={reset}
+                      className="mt-3 w-full rounded-md border border-border bg-surface-2 px-3 py-2 text-xs font-semibold transition-transform duration-200 ease-out-quint hover:bg-surface-3 active:scale-[0.98]"
+                    >
+                      Nueva sesión
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </aside>
         </div>
