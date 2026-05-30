@@ -4,7 +4,10 @@
 
 import type { Abi, Address } from "viem";
 
-export const GHOSTRIG_ADDRESS = (process.env.NEXT_PUBLIC_GHOSTRIG_ADDRESS ?? "") as Address | "";
+// Deployed & verified GhostRig on Monad testnet. Defaults to the live contract so the
+// app is connected for real out of the box (env var can override for a redeploy).
+export const GHOSTRIG_ADDRESS = (process.env.NEXT_PUBLIC_GHOSTRIG_ADDRESS ??
+  "0x2F9e911f380e03557Ec65F941Dba32c879172b9a") as Address;
 
 /** Free trial before billing starts. Must match the contract's TRIAL_SECONDS. */
 export const TRIAL_SECONDS = 10;
@@ -124,6 +127,20 @@ export const ghostRigAbi = [
     stateMutability: "view",
     inputs: [{ name: "sessionId", type: "uint256" }],
     outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "sessionCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "rigCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",

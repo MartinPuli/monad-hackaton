@@ -26,7 +26,9 @@ import {
 } from "@phosphor-icons/react";
 import { MOCK, TRIAL_SECONDS, EXPLORER_TX } from "@/lib/ghostrig";
 import { CHAIN } from "@/lib/wagmi";
-import { useSession, DEMO_PRICE_PER_FPS } from "@/lib/useSession";
+import { DEMO_PRICE_PER_FPS } from "@/lib/useSession";
+import { useSessionLive } from "@/lib/useSessionLive";
+import { GameStream } from "./GameStream";
 
 const fmt = (wei: bigint, dp = 6) => Number(formatEther(wei)).toFixed(dp);
 const QUICK_AMOUNTS = ["0.05", "0.1", "0.5"];
@@ -37,7 +39,7 @@ export default function Home() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
-  const { state, open, close, reset } = useSession();
+  const { state, open, close, reset } = useSessionLive();
   const [deposit, setDeposit] = useState("0.05");
   const [showHelp, setShowHelp] = useState(false);
 
@@ -73,6 +75,11 @@ export default function Home() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [inSession, showHelp, close]);
+
+  // While playing, take over the screen: embedded game + floating payment HUD.
+  if (inSession) {
+    return <GameStream state={state} onExit={close} />;
+  }
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
