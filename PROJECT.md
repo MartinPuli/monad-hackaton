@@ -30,7 +30,15 @@ Es **Uber / Airbnb, pero de GPUs para gaming.**
 
 ### Pagás solo por lo que usás
 
-Nada de suscripciones mensuales. **Pay-per-use real:** cargás saldo, y se va descontando mientras jugás, en tiempo real, según las horas y la calidad (FPS / resolución) que efectivamente consumís.
+Nada de suscripciones mensuales. **Pay-per-use real:** cargás saldo, y se va descontando mientras jugás, en tiempo real, según los **FPS que efectivamente recibís**.
+
+### Reglas del modelo (decididas)
+
+- **Moneda:** MON nativo.
+- **Prueba gratis (anti-estafa):** los primeros **10 segundos no se cobran**. El cliente verifica que el juego funciona y se ve bien antes de pagar un peso. Si es una estafa o anda mal, se va sin pagar.
+- **El host fija el precio por FPS:** `registerRig(pricePerFps)`. El cliente no puede manipularlo (está registrado on-chain a nombre del host).
+- **Se paga por la calidad real:** cada segundo medimos los FPS efectivamente entregados y la deuda crece `fps × pricePerFps`. Más fluido = más caro; cortado = más barato. Pagás por lo que recibís.
+- **Una transacción por segundo con el FPS real** (`reportFps`): cada segundo escribimos en Monad un dato real de uso. **El cobro del total se hace al cerrar la sesión** (`closeSession`), no segundo a segundo — el host registra durante la sesión y embolsa todo junto al final, reembolsando al cliente el saldo no usado.
 
 ---
 
@@ -87,18 +95,20 @@ CLIENTE (dispositivo débil)
  └─ Wallet: deposita saldo, ve cómo se descuenta en vivo
 
 MONAD (contrato de mercado/escrow)
- ├─ openSession()  : cliente deposita saldo y arranca la sesión
- ├─ settle()       : el host cobra lo acumulado cada N segundos
- └─ closeSession() : cierre + reembolso del saldo no usado
+ ├─ registerRig(pricePerFps) : el host fija su precio por FPS (una vez)
+ ├─ openSession(rigId)       : cliente deposita saldo y arranca la sesión
+ ├─ reportFps(id, fps)       : cada segundo (desde el seg 11) registra el FPS real → acumula deuda
+ └─ closeSession(id)         : cobra el total acumulado al host + reembolsa el saldo no usado
 ```
 
 ### Modelo de confianza (cómo evitamos trampas sin intermediario)
 
 - El cliente deposita el saldo **antes** en el contrato (escrow). El host no juega gratis.
-- El host solo cobra lo ya servido, en intervalos cortos (ej. cada 5-10 s).
-- Si el host manda frames basura, el cliente **cierra la sesión** y deja de pagar.
+- **Trial de 10 s:** el cliente prueba que el juego funciona antes de que corra el reloj de cobro.
+- La deuda se **acumula on-chain cada segundo** según el FPS real; el **pago al host se ejecuta al cerrar**.
+- Si el host manda frames basura o infla el FPS, el cliente **lo ve en vivo y cierra la sesión**.
 - Si el cliente intenta no pagar, no puede: el saldo ya está bloqueado on-chain.
-- **Pérdida máxima de cualquiera si el otro hace trampa = 1 intervalo (~5-10 s).** Ese es el trade-off consciente de no usar channels: simplicidad enorme a cambio de arriesgar segundos.
+- **El cliente es el verificador:** como ve el juego en tiempo real, no hace falta verificación criptográfica del cómputo. La pérdida máxima por trampa de cualquiera de los dos es **~1 segundo**.
 
 ---
 
@@ -119,11 +129,15 @@ MONAD (contrato de mercado/escrow)
 
 ## 8. La demo que cierra el trato
 
+**Setup real:** un amigo prende **Minecraft + Sunshine** en su PC (el host); jugamos desde otra compu en la **misma red local (LAN/wifi)** — Sunshine/Moonlight da baja latencia y se siente fluido.
+
 1. Cliente sin GPU abre la app, conecta wallet, deposita saldo en Monad.
-2. Hace match con un host (otra PC nuestra en la demo).
-3. Juega algo real por streaming — se ve corriendo en pantalla.
-4. **Split-screen:** a un lado el juego, al otro el explorer de Monad mostrando una tx de `settle()` cada ~5 s y el balance del host subiendo en vivo.
-5. El cliente cierra la sesión: saldo no usado reembolsado al instante.
+2. Se conecta al host (la PC del amigo con Minecraft).
+3. **Juega Minecraft de verdad** por streaming — se ve corriendo en una compu que no lo está corriendo.
+4. Primeros **10 s gratis** (prueba). Después, **split-screen:** a un lado Minecraft, al otro el explorer de Monad mostrando una tx de `reportFps()` por segundo con el FPS real, y la deuda subiendo en vivo.
+5. El cliente cierra la sesión: el host cobra el total y el saldo no usado se reembolsa al instante.
+
+> **Plan B (si la red del evento falla):** mismo pago 100% real en Monad, pero el "juego" es un stream local/simulado con FPS medible. La historia se cuenta igual.
 
 > Si el jurado ve **frames corriendo Y plata moviéndose on-chain en tiempo real en la misma pantalla**, ganamos la parte emocional. La narrativa técnica gana el resto.
 

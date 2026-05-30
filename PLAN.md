@@ -7,12 +7,20 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 ---
 
-## WB0 — Setup & decisiones 🔴
+## Decisiones cerradas (ya no son abiertas)
+
+- **Moneda:** MON nativo.
+- **Unidad de cobro:** **por FPS** — el host fija `pricePerFps`; la deuda crece `fps × pricePerFps` por segundo.
+- **Trial:** **10 segundos gratis** antes de empezar a cobrar (core, va en el contrato).
+- **Liquidación:** se **registra el FPS cada segundo** (`reportFps`) acumulando deuda on-chain; el **pago al host se ejecuta al cerrar** (`closeSession`).
+- **Precio:** lo fija el **host** vía `registerRig`, registrado on-chain (el cliente no lo pasa ni lo manipula).
+- **Demo:** **Minecraft real** vía Sunshine/Moonlight en **LAN**; 1 host = la PC de un amigo. Plan B: stream simulado.
+
+---
+
+## WB0 — Setup 🔴
 **Objetivo:** dejar el terreno listo para hackear sin fricción.
 
-- [ ] Confirmar nombre del proyecto (GhostRig u otro).
-- [ ] Definir la unidad de pago: precio por segundo, o precio por "1000 frames @ resolución X".
-- [ ] Definir intervalo de liquidación (recomendado: **cada 5 s**).
 - [ ] Crear wallet de deploy con `cast wallet new` y **persistirla** (`.env`, en `.gitignore`).
 - [ ] Fondear la wallet vía faucet de Monad (agent API).
 - [ ] Estructura de carpetas: `/contracts` (Foundry), `/web` (frontend), `/host-agent`, `/docs`.
@@ -26,13 +34,16 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 - [ ] `forge init` en `/contracts`, configurar `foundry.toml` (`evm_version = "prague"`, `solc 0.8.28`).
 - [ ] Contrato `GhostRig.sol` con:
-  - `struct Session { client, host, deposit, spent, ratePerSecond, startTime, lastSettle, open }`
-  - `openSession(host, ratePerSecond) payable` → cliente deposita saldo, abre sesión.
-  - `settle(sessionId)` → host cobra lo acumulado desde `lastSettle` (calculado por tiempo × rate, cap al depósito).
-  - `closeSession(sessionId)` → liquidación final + reembolso del saldo no usado al cliente.
+  - `struct Rig { host, pricePerFps, active }` → registro del host.
+  - `struct Session { client, rigId, deposit, accrued, startTime, lastReport, open }`
+  - `TRIAL_SECONDS = 10` constante.
+  - `registerRig(pricePerFps)` → el host registra su rig y fija el precio por FPS (on-chain, no manipulable por el cliente).
+  - `openSession(rigId) payable` → cliente deposita saldo, abre sesión, guarda `startTime`. Lee el `pricePerFps` del rig.
+  - `reportFps(sessionId, fps)` → (solo después del trial de 10 s) acumula `accrued += fps × pricePerFps`, cap al depósito; si llega al cap, marca para cierre.
+  - `closeSession(sessionId)` → paga `accrued` al host + reembolsa `deposit - accrued` al cliente.
   - `clientTimeout(sessionId)` → si el host abandona, el cliente recupera el saldo.
-  - Eventos: `SessionOpened`, `Settled`, `SessionClosed` (para que el frontend escuche en vivo).
-- [ ] Guards: reentrancy, solo host puede `settle`, solo cliente/host pueden cerrar, etc.
+  - Eventos: `RigRegistered`, `SessionOpened`, `FpsReported(id, fps, accrued)`, `SessionClosed` (para que el frontend escuche en vivo).
+- [ ] Guards: reentrancy, solo el host del rig puede `reportFps`, solo cliente/host pueden cerrar, no cobrar más que el depósito, no `reportFps` durante el trial.
 
 **Entregable:** `GhostRig.sol` compilando.
 
@@ -41,10 +52,12 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 ## WB2 — Tests del contrato 🔴
 **Objetivo:** garantizar que la plata no se pierde ni se duplica.
 
-- [ ] Test: apertura descuenta el depósito correcto.
-- [ ] Test: `settle` paga exactamente lo proporcional al tiempo transcurrido.
-- [ ] Test: no se puede cobrar más que el depósito.
-- [ ] Test: cierre reembolsa el remanente correcto.
+- [ ] Test: apertura bloquea el depósito correcto.
+- [ ] Test: `reportFps` durante los primeros 10 s NO acumula deuda (trial gratis).
+- [ ] Test: `reportFps` después del trial acumula `fps × pricePerFps` exacto.
+- [ ] Test: no se puede acumular/cobrar más que el depósito (cap).
+- [ ] Test: `closeSession` paga `accrued` al host y reembolsa el remanente al cliente.
+- [ ] Test: solo el host del rig puede `reportFps`; el cliente no puede manipular el precio.
 - [ ] Test: timeout del cliente funciona.
 - [ ] Test: nadie ajeno puede cobrar/cerrar.
 
@@ -68,15 +81,16 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 **Objetivo:** el proceso que sirve el juego y cobra.
 
 - [ ] Servicio Node/TS que:
-  - cuenta "frames servidos" / tiempo de sesión (real o simulado al inicio).
-  - cada N s, firma y envía `settle(sessionId)` a Monad con la wallet del host.
-  - emite estado (frames, fps, saldo cobrado) para mostrar en UI.
-- [ ] **Decisión de streaming** (elegir según tiempo disponible):
-  - 🔴 v0: **simulado** — un video/canvas loop como "el juego", para validar todo el flujo de pago.
-  - 🟡 v1: streaming real con **WebRTC** (captura de pantalla → cliente).
-  - 🟢 v2: integrar **Sunshine/Moonlight** para un juego real.
+  - mide los **FPS reales** entregados por segundo (real, o simulado al inicio).
+  - cada segundo (desde el seg 11) envía `reportFps(sessionId, fps)` a Monad con la wallet del host.
+  - emite estado (fps, deuda acumulada) para mostrar en UI.
+- [ ] **Streaming — objetivo: Minecraft real en LAN**:
+  - 🔴 v0: **simulado** — un canvas/video loop con FPS medible, para validar todo el flujo de pago primero (plan B de la demo).
+  - 🔴 v1 (objetivo demo): **Sunshine** corriendo Minecraft en la PC del host + **Moonlight** en el cliente, en la misma red local.
+  - 🟢 v2: WebRTC embebido en la web (post-hackathon).
+- [ ] **Integración pago↔stream:** el stream solo arranca con sesión abierta; al cerrar/agotarse el saldo, el Gateway corta Sunshine. (Aquí está el mayor riesgo de integración.)
 
-**Entregable:** host que liquida automáticamente cada N s contra el contrato.
+**Entregable:** host que mide FPS y lo reporta cada segundo al contrato, atado al arranque/corte del stream.
 
 ---
 
@@ -85,9 +99,10 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 - [ ] App con **Next.js + viem/wagmi**, chain `monadTestnet` de `viem/chains`.
 - [ ] Conectar wallet (MetaMask con red Monad testnet).
-- [ ] Pantalla: depositar saldo → `openSession()`.
-- [ ] Vista de juego: recibe el stream (o el simulado) + captura inputs.
-- [ ] **Saldo en vivo:** escuchar eventos `Settled` y mostrar el balance descontándose en tiempo real.
+- [ ] Pantalla: elegir rig (el de tu amigo) → depositar saldo → `openSession()`.
+- [ ] Vista de juego: recibe el stream (Minecraft vía Moonlight, o el simulado) + captura inputs.
+- [ ] **Trial visible:** contador verde "prueba gratis 10 s" antes de cobrar.
+- [ ] **Deuda en vivo:** escuchar eventos `FpsReported` y mostrar FPS del momento + deuda subiendo / saldo bajando en tiempo real.
 - [ ] Botón "Terminar sesión" → `closeSession()` + mostrar reembolso.
 
 **Entregable:** flujo completo cliente jugable end-to-end.
@@ -108,10 +123,10 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 ## WB7 — La demo (split-screen) 🔴
 **Objetivo:** el momento que gana el hackathon.
 
-- [ ] Pantalla dividida: **juego/stream** a la izquierda, **explorer de Monad** a la derecha.
-- [ ] Mostrar tx de `settle()` apareciendo cada ~5 s.
-- [ ] Mostrar balance del host **subiendo en vivo** y saldo del cliente **bajando**.
-- [ ] Guion de demo de 2-3 min ensayado.
+- [ ] Pantalla dividida: **Minecraft/stream** a la izquierda, **explorer de Monad** a la derecha.
+- [ ] Mostrar tx de `reportFps()` apareciendo cada segundo con el FPS real.
+- [ ] Mostrar deuda del cliente **subiendo en vivo** y, al cerrar, el host cobrando + reembolso.
+- [ ] Guion de demo de 2-3 min ensayado (incluye los 10 s de prueba gratis).
 
 **Entregable:** demo reproducible + guion.
 
@@ -132,23 +147,59 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 ## Camino crítico (orden sugerido)
 
 ```
-WB0 → WB1 → WB2 → WB3   (contrato vivo y verificado = base trustless)
-            ↓
-        WB4 + WB5 en paralelo   (host cobra + cliente paga)
-            ↓
-          WB7   (demo split-screen)
-            ↓
-      WB6 y WB8 según tiempo
+WB0 (juntos, 30 min)
+   ↓
+DEV A: WB1 → WB2 → WB3        DEV B: WB5 (UI con mock) + WB4-v0 (host simulado)
+   (contrato vivo + verificado)        en paralelo, contra una ABI/mock acordada
+                  ↓ (se encuentran cuando el contrato está deployado)
+        Integración: WB4-v1 (Sunshine/Minecraft) + WB5 conectado al contrato real
+                  ↓
+              WB7 (demo) — juntos
+                  ↓
+              WB8 (pitch) — Dev A mientras Dev B pule la demo
 ```
 
 ## Regla de oro del alcance
-El **protagonista es el contrato + la liquidación en vivo sobre Monad**. El streaming es secundario: si aprieta el tiempo, **stream simulado + liquidación real on-chain** cuenta toda la historia. No quemar el hackathon peleando con WebRTC.
+El **protagonista es el contrato + la liquidación en vivo sobre Monad**. El streaming es secundario: si aprieta el tiempo, **stream simulado + liquidación real on-chain** cuenta toda la historia. No quemar el hackathon peleando con el streaming.
 
 ---
 
-## Decisiones abiertas (para revisar antes de ejecutar)
-1. **Unidad de cobro:** ¿por segundo (simple) o por frames×calidad (más fiel al "pay-per-fps")?
-2. **Intervalo de liquidación:** ¿5 s? (balance entre realismo de demo y nº de tx).
-3. **Moneda:** ¿MON nativo, o un stablecoin/token de testnet?
-4. **Streaming en la demo:** ¿arrancamos simulado y subimos a WebRTC, o vamos directo a WebRTC?
-5. **Nombre final del producto.**
+# 👥 División del trabajo — 2 developers
+
+La división está pensada para que **trabajen en paralelo casi sin bloquearse**. La clave: **acordar primero la interfaz del contrato (ABI) en WB0**, así cada uno programa contra esa interfaz aunque el otro no haya terminado.
+
+## 🔵 DEV A — "On-chain / Backend" (dueño del dinero)
+**Responsable de que la plata sea correcta y el host cobre bien.**
+
+| WB | Tarea | Prioridad |
+|----|-------|-----------|
+| WB1 | Escribir `GhostRig.sol` (registerRig, openSession, reportFps, closeSession, timeout) | 🔴 |
+| WB2 | Tests Foundry (trial, cap, cobro, permisos) — `forge test` en verde | 🔴 |
+| WB3 | Deploy + verificación en Monad testnet; entregar address + ABI | 🔴 |
+| WB4 | **Host-agent**: mide FPS real y llama `reportFps` cada segundo con la wallet del host | 🔴 |
+| WB8 | Pitch deck (narrativa anti-state-channels, cuenta de los 100k) | 🟡 |
+
+**Carpetas:** `/contracts`, `/host-agent`, `/docs` (pitch).
+**Stack:** Solidity, Foundry, Node/TS (host-agent), viem (para firmar tx del host).
+
+## 🟢 DEV B — "Frontend / Streaming" (dueño de la experiencia)
+**Responsable de que el juez vea, toque y entienda.**
+
+| WB | Tarea | Prioridad |
+|----|-------|-----------|
+| WB5 | App Next.js + viem/wagmi: conectar wallet, depositar, `openSession`, deuda en vivo, cerrar | 🔴 |
+| WB6 | Conexión cliente↔host en LAN (Sunshine/Moonlight) — versión mínima, 1 host | 🟡 |
+| WB4-stream | Montar **Sunshine + Minecraft** en la PC del host y **Moonlight** en el cliente | 🔴 |
+| WB7 | La demo split-screen (juego + explorer) + ensayar guion | 🔴 |
+
+**Carpetas:** `/web`, setup de Sunshine/Moonlight.
+**Stack:** Next.js, viem/wagmi, Sunshine/Moonlight (config, no C++).
+
+## 🤝 El contrato entre ambos (la interfaz que acuerdan en WB0)
+Para no bloquearse, en WB0 escriben juntos **un archivo `interface.md`** con:
+- Las firmas exactas: `registerRig(uint256 pricePerFps)`, `openSession(uint256 rigId) payable`, `reportFps(uint256 sessionId, uint256 fps)`, `closeSession(uint256 sessionId)`.
+- Los eventos: `FpsReported(uint256 sessionId, uint256 fps, uint256 accrued)`, etc.
+- Mientras Dev A termina el contrato real, **Dev B trabaja contra un mock con esa misma ABI** (un contrato dummy deployado, o datos simulados). Cuando WB3 entrega el address real, Dev B solo cambia la dirección.
+
+## Punto de sincronización (1 sola dependencia dura)
+Dev B necesita el **address + ABI** de Dev A (fin de WB3) para conectar de verdad. Hasta entonces, **ninguno espera al otro**: A construye/testea el contrato, B construye la UI + monta el streaming. Se juntan en la integración y la demo.
