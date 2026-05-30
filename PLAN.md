@@ -7,17 +7,22 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 ---
 
-## WB0 — Setup & decisiones 🔴
+## WB0 — Setup & decisiones ✅ COMPLETADO
 **Objetivo:** dejar el terreno listo para hackear sin fricción.
 
-- [ ] Confirmar nombre del proyecto (GhostRig u otro).
-- [ ] Definir la unidad de pago: precio por segundo, o precio por "1000 frames @ resolución X".
-- [ ] Definir intervalo de liquidación (recomendado: **cada 5 s**).
-- [ ] Crear wallet de deploy con `cast wallet new` y **persistirla** (`.env`, en `.gitignore`).
-- [ ] Fondear la wallet vía faucet de Monad (agent API).
-- [ ] Estructura de carpetas: `/contracts` (Foundry), `/web` (frontend), `/host-agent`, `/docs`.
+- [x] Decisiones cerradas (ver sección abajo).
+- [x] Foundry instalado (v1.7.1) en `~/.foundry/bin`.
+- [x] Estructura de carpetas: `/contracts` (Foundry init), `/web`, `/host-agent`.
+- [x] `foundry.toml` configurado (`evm_version = "prague"`, `solc 0.8.28`, rpc monad_testnet).
+- [x] Wallet de deploy creada y persistida en `.env` (en `.gitignore`).
+      Address: `0x66D5331F872069F9C204aF56835f664d545E2585`
+- [x] Wallet fondeada vía faucet: **1 MON** en testnet (balance confirmado).
+- [x] Archivos de ejemplo (Counter) eliminados.
 
-**Entregable:** repo con estructura + wallet fondeada en testnet.
+**Entregable:** ✅ repo con estructura + wallet fondeada en testnet.
+
+> Nota: `~/.foundry/bin` no está en el PATH permanente. En cada sesión de terminal nueva, anteponer:
+> `export PATH="$PATH:/c/Users/rober/.foundry/bin"` (o agregarlo al perfil).
 
 ---
 
@@ -146,9 +151,13 @@ El **protagonista es el contrato + la liquidación en vivo sobre Monad**. El str
 
 ---
 
-## Decisiones abiertas (para revisar antes de ejecutar)
-1. **Unidad de cobro:** ¿por segundo (simple) o por frames×calidad (más fiel al "pay-per-fps")?
-2. **Intervalo de liquidación:** ¿5 s? (balance entre realismo de demo y nº de tx).
-3. **Moneda:** ¿MON nativo, o un stablecoin/token de testnet?
-4. **Streaming en la demo:** ¿arrancamos simulado y subimos a WebRTC, o vamos directo a WebRTC?
-5. **Nombre final del producto.**
+## Decisiones cerradas ✅
+1. **Unidad de cobro:** por **segundo** (`tiempo × ratePerSecond`). El rate refleja la calidad/FPS acordados al abrir la sesión. Nada que el host pueda falsear.
+2. **Intervalo de liquidación:** **cada 5 s**.
+3. **Moneda:** **MON nativo** (testnet).
+4. **Streaming:** **real**, con **Sunshine (host) + Moonlight (cliente)**. El host-agent ata el pago al ciclo de vida del stream (corta el stream cuando se agota el saldo / se cierra la sesión).
+5. **Nombre:** GhostRig (placeholder, sujeto a cambio).
+
+## Decisiones de arquitectura derivadas
+- **Streaming ≠ web de pago:** son dos superficies. El jugador paga en la web (wallet) y juega vía Moonlight. El **host-agent** es el pegamento entre el contrato y Sunshine.
+- **Sunshine/Moonlight son GPL-3.0** → ok para hackathon; no contamina nuestro contrato ni web (procesos separados).
