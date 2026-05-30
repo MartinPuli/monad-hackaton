@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GhostRig — Rent FPS on Monad",
+  title: "KNTX — Rent FPS on Monad",
   description: "Play high-end games on any device. Pay per FPS, settled live on Monad.",
+  icons: { icon: "/icon.png" },
 };
 
 export default function RootLayout({
