@@ -10,7 +10,6 @@ import {
 } from "wagmi";
 import { formatEther } from "viem";
 import {
-  Ghost,
   GameController,
   Wallet,
   Play,
@@ -24,6 +23,7 @@ import {
   Info,
   Keyboard,
 } from "@phosphor-icons/react";
+import { KntxMark } from "@/components/KntxMark";
 import { MOCK, TRIAL_SECONDS, EXPLORER_TX } from "@/lib/ghostrig";
 import { CHAIN } from "@/lib/wagmi";
 import { DEMO_PRICE_PER_FPS } from "@/lib/useSession";
@@ -85,10 +85,8 @@ export default function Home() {
     <div className="flex min-h-[100dvh] flex-col">
       <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/95 px-5 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2.5">
-          <Ghost size={24} weight="fill" className="text-accent" />
-          <span className="text-lg font-bold tracking-tight">
-            Ghost<span className="text-accent">Rig</span>
-          </span>
+          <KntxMark size={22} className="text-accent" />
+          <span className="text-lg font-bold tracking-[0.2em]">KNTX</span>
           <span className="ml-2 hidden text-xs text-muted sm:inline">
             rentá FPS, pagás en vivo sobre Monad
           </span>
@@ -146,7 +144,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-3 rounded-md border border-live/40 bg-live/10 px-4 py-2.5 text-sm">
             <WarningCircle size={18} weight="fill" className="shrink-0 text-live" />
             <span className="flex-1">
-              Estás en otra red. GhostRig corre sobre <strong>Monad testnet</strong>.
+              Estás en otra red. KNTX corre sobre <strong>Monad testnet</strong>.
             </span>
             <button
               onClick={() => switchChain({ chainId: CHAIN.id })}
@@ -429,7 +427,7 @@ function HelpPanel({ onClose }: { onClose: () => void }) {
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Cómo funciona GhostRig"
+        aria-label="Cómo funciona KNTX"
         className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-2xl"
       >
         <div className="flex items-center justify-between">

@@ -1,4 +1,7 @@
-# GhostRig — Plan de ejecución (Workblocks)
+# KNTX — Plan de ejecución (Workblocks)
+
+> **Nombre del producto:** **KNTX** (antes "GhostRig"). El rename es de marca/UI; el
+> contrato deployado sigue llamándose `GhostRig` on-chain (no se re-deploya).
 
 Arquitectura elegida: **liquidación on-chain directa, sin state channels.**
 Red: **Monad testnet (chain ID 10143)**. Smart contracts con **Foundry**. Frontend con **viem/wagmi**.
@@ -102,7 +105,7 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 
 ---
 
-## WB5 — Frontend / Cliente 🔴 (Dev B) — UI lista en MOCK, falta wiring real
+## WB5 — Frontend / Cliente 🔴 (Dev B) — base lista en MOCK
 **Objetivo:** la app donde el jugador conecta wallet, deposita y juega.
 
 - [x] App con **Next.js 16 + wagmi 3/viem 2**, chain `monadTestnet` de `viem/chains`.
@@ -112,12 +115,35 @@ Leyenda de prioridad: 🔴 core (sin esto no hay demo) · 🟡 importante · �
 - [x] **Trial visible:** contador verde "prueba gratis 10 s" antes de cobrar.
 - [x] **Deuda en vivo:** log de eventos `FpsReported` (mock 1/seg) + FPS + deuda subiendo / saldo bajando.
 - [x] Botón "Terminar sesión" → `closeSession()` + reembolso (mock).
-- [ ] **Wiring al contrato real** (depende del address de WB3 de Dev A). Ver `web/README.md`.
+- [x] **Wiring al contrato real** → **lo toma Dev A** (Martin). Ya alineó el ABI del front al contrato
+      deployado (`web/src/lib/ghostrig.ts`). Dev B no se ocupa del wiring.
 
 **Estado:** corre en `web/`, `npm run dev` → :3000. Build y typecheck en verde. Banner "MOCK MODE"
-hasta que se configure `NEXT_PUBLIC_GHOSTRIG_ADDRESS`. ABI acordada en `interface.md`.
+hasta que se configure `NEXT_PUBLIC_GHOSTRIG_ADDRESS`.
 
-**Entregable:** ✅ flujo cliente jugable end-to-end (en mock); pendiente conectar al contrato real.
+**Entregable:** ✅ flujo cliente jugable end-to-end (en mock).
+
+---
+
+## WB5b — UX/UI KNTX: cliente + host 🔴 (Dev B) — FOCO ACTUAL
+**Objetivo:** que cliente y host tengan una experiencia pulida y con identidad propia (marca KNTX),
+lista para impresionar al juez. El wiring lo hace Martin en paralelo; Dev B trabaja sobre la UI.
+
+- [ ] **Marca KNTX:** logo, wordmark, favicon, paleta y tipografía. Reemplazar el branding "GhostRig"
+      en la nav, `layout.tsx` (metadata/título), copy y assets.
+- [ ] **Vista CLIENTE (pulido):** depósito → trial → sesión en vivo → liquidación. Refinar jerarquía
+      visual, estados (loading/empty/error), micro-interacciones y el panel de liquidación on-chain.
+- [ ] **Vista HOST (nueva):** pantalla del dueño de la PC — registrar rig (`registerRig`), fijar/editar
+      precio (`setPrice`), pausar/activar (`setActive`), ver sesión activa + FPS reportados + deuda
+      acumulada, y **retirar ganancias** (`withdraw` / `pendingWithdrawals`).
+- [ ] **Switch cliente/host:** navegación o ruta para alternar entre ambas superficies.
+- [ ] Responsive + accesibilidad (foco, contraste, teclado) en ambas vistas.
+- [ ] Mantener todo funcionando en MOCK para demo sin depender del host prendido.
+
+**Coordinación con Dev A:** la UI consume los hooks/estado que Martin cablea (`useSession` real,
+lecturas de `sessions()`/`rigs()`/`pendingWithdrawals`). Acordar la forma del estado para no pisarse.
+
+**Entregable:** cliente y host con identidad KNTX, pulidos y demostrables.
 
 ---
 
@@ -191,20 +217,26 @@ La división está pensada para que **trabajen en paralelo casi sin bloquearse**
 | WB2 | Tests Foundry (trial, cap, cobro, permisos) — `forge test` en verde | 🔴 |
 | WB3 | Deploy + verificación en Monad testnet; entregar address + ABI | 🔴 |
 | WB4 | **Host-agent**: mide FPS real y llama `reportFps` cada segundo con la wallet del host | 🔴 |
+| WB5-wiring | **Wiring del front al contrato real** (openSession/closeSession/withdraw + watch de `FpsReported`) — traspasado de Dev B | 🔴 |
 | WB8 | Pitch deck (narrativa anti-state-channels, cuenta de los 100k) | 🟡 |
 
 **Carpetas:** `/contracts`, `/host-agent`, `/docs` (pitch).
 **Stack:** Solidity, Foundry, Node/TS (host-agent), viem (para firmar tx del host).
 
-## 🟢 DEV B — "Frontend / Streaming" (dueño de la experiencia)
-**Responsable de que el juez vea, toque y entienda.**
+## 🟢 DEV B — "Frontend / UX-UI" (dueño de la experiencia)
+**Responsable de que el juez vea, toque y entienda. Foco actual: diseño KNTX (cliente + host).**
 
 | WB | Tarea | Prioridad |
 |----|-------|-----------|
-| WB5 | App Next.js + viem/wagmi: conectar wallet, depositar, `openSession`, deuda en vivo, cerrar | 🔴 |
+| WB5 | App Next.js + viem/wagmi: base del cliente (✅ en mock; wiring real → Dev A) | ✅ |
+| WB5b | **UX/UI KNTX: marca + pulido vista cliente + vista host nueva** | 🔴 |
 | WB6 | Conexión cliente↔host en LAN (Sunshine/Moonlight) — versión mínima, 1 host | 🟡 |
 | WB4-stream | Montar **Sunshine + Minecraft** en la PC del host y **Moonlight** en el cliente | 🔴 |
 | WB7 | La demo split-screen (juego + explorer) + ensayar guion | 🔴 |
+
+> **Nota de reparto (actualizada):** el **wiring al contrato real lo toma Dev A** (Martin), que ya
+> alineó el ABI del front. Dev B se concentra en **diseño y experiencia** (marca KNTX, vista cliente
+> pulida, vista host nueva).
 
 **Carpetas:** `/web`, setup de Sunshine/Moonlight.
 **Stack:** Next.js, viem/wagmi, Sunshine/Moonlight (config, no C++).
