@@ -49,10 +49,20 @@ export default function Home() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
-  const { state, open, close, reset } = useSessionLive();
+  const { state, open, close, reset, withdraw } = useSessionLive();
   const { rigs, loading: rigsLoading } = useRigs();
   const [selectedRigId, setSelectedRigId] = useState<bigint | null>(null);
   const [deposit, setDeposit] = useState("0.05");
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  const onWithdraw = useCallback(async () => {
+    setWithdrawing(true);
+    try {
+      await withdraw();
+    } finally {
+      setWithdrawing(false);
+    }
+  }, [withdraw]);
   const [showHelp, setShowHelp] = useState(false);
 
   // Host stream profile published from the host dashboard (game / GPU / URL /
@@ -426,6 +436,24 @@ export default function Home() {
                         <MiniStat label="Pagado al host" value={`${fmt(state.paidToHost)}`} />
                         <MiniStat label="Reembolsado" value={`${fmt(state.refund)}`} />
                       </div>
+                      {state.refund > 0n && (
+                        <button
+                          onClick={onWithdraw}
+                          disabled={withdrawing || wrongNetwork}
+                          className="kntx-cta mt-3 flex w-full items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {withdrawing ? (
+                            <CircleNotch size={16} weight="bold" className="animate-spin" />
+                          ) : (
+                            <Wallet size={16} weight="bold" />
+                          )}
+                          Retirar reembolso a mi wallet
+                        </button>
+                      )}
+                      <p className="mt-2 text-[11px] leading-relaxed text-muted">
+                        El reembolso quedó acreditado on-chain (escrow). Retiralo cuando quieras —
+                        es el <code className="font-mono">withdraw()</code> del pull-payment.
+                      </p>
                     </div>
                   )}
                 </div>

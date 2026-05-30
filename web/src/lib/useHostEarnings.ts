@@ -18,8 +18,12 @@ export interface HostEarnings {
   claimable: bigint;
   /** Income observed live this session (wei, cumulative display). */
   liveAccrued: bigint;
+  /** Lifetime earned across all settled sessions (wei). */
+  totalEarned: bigint;
   /** Latest reported FPS for the active session. */
   lastFps: number;
+  /** Whether a player session is live right now. */
+  live: boolean;
   /** rigIds owned by the connected wallet. */
   myRigIds: bigint[];
 }
@@ -109,7 +113,9 @@ export function useHostEarnings() {
   const earnings: HostEarnings = {
     claimable: BigInt(bus.claimable),
     liveAccrued: live?.active ? BigInt(live.accrued) : 0n,
+    totalEarned: BigInt(bus.totalEarned),
     lastFps: live?.active ? live.fps : 0,
+    live: Boolean(live?.active),
     myRigIds,
   };
 

@@ -1,33 +1,32 @@
 "use client";
 
-// HARDCODED DEMO billing (reliable, no dependency on the host-agent / on-chain
-// FpsReported loop). While the player is "in game" we tick locally:
-//   - FPS: random 30–60
-//   - cost: a flat 0.000001 MON per second, after the free trial
-// On exit we settle: the accrued MON is (best-effort) sent on-chain to the rig's
-// host wallet, and the host dashboard is updated live via demoBus.
+// REAL escrow flow on the deployed GhostRig contract (Monad testnet). Two signatures
+// for the player, exactly as the contract is designed:
 //
-// Same interface as before ({ state, open, close, reset }) so page.tsx is untouched.
-// Turn the real payout off with NEXT_PUBLIC_DEMO_PAYOUT=off (then it's pure UI).
+//   open(deposit, rigId) → openSession(rigId) *payable*  → TX 1: deposits MON in escrow.
+//   ...the host-agent (same wallet that registered the rig) reports the real FPS each
+//      second via reportFps; we watch `FpsReported` to drive the live spend/FPS feed
+//      with the REAL reportFps tx hashes (the "chat is the blockchain").
+//   close()              → closeSession(sessionId)        → TX 2: credits the host the
+//      accrued amount and refunds the unused deposit to the client (pull-payment).
+//   withdraw()           → withdraw()                     → pulls your credited funds
+//      (the client's refund / the host's earnings) into the wallet.
+//
+// IMPORTANT: the host-agent MUST be running with the rig's wallet, or `accrued` stays
+// 0 — the host earns nothing and the whole deposit is refunded on close.
+//
+// Same interface as before ({ state, open, close, reset, withdraw }) so page.tsx works.
+// demoBus is still fed (best-effort) so a host dashboard open in the SAME browser lights
+// up live; cross-machine, the host page should read on-chain (pendingWithdrawals).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { parseEther, type Address } from "viem";
-import { useAccount, usePublicClient, useSendTransaction } from "wagmi";
+import { parseEther, parseEventLogs, type Address, type Hex } from "viem";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { ghostRigAbi, GHOSTRIG_ADDRESS, TRIAL_SECONDS } from "./ghostrig";
 import type { SessionState, FpsTick } from "./useSession";
 import { demoBus } from "./demoBus";
 
 const RIG_ID = BigInt(process.env.NEXT_PUBLIC_RIG_ID ?? "0");
-// Hardcoded price: 0.000001 MON charged per second (after the trial).
-const PRICE_PER_SEC = parseEther("0.000001");
-// Optional explicit payout target; otherwise we read the rig's host from chain.
-const HOST_ADDRESS_ENV = process.env.NEXT_PUBLIC_HOST_ADDRESS as Address | undefined;
-const REAL_PAYOUT = process.env.NEXT_PUBLIC_DEMO_PAYOUT !== "off";
-const ZERO = "0x0000000000000000000000000000000000000000";
-
-const randomFps = () => 30 + Math.floor(Math.random() * 31); // 30..60 inclusive
-const fakeHash = () =>
-  "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 
 function initial(): SessionState {
   return {
@@ -46,122 +45,184 @@ function initial(): SessionState {
 
 export function useSessionLive() {
   const [state, setState] = useState<SessionState>(initial());
+  // sessionId lives in STATE (not just a ref) so the watcher effect re-subscribes
+  // the moment the session is open.
+  const [sessionId, setSessionId] = useState<bigint | null>(null);
   const { address } = useAccount();
   const publicClient = usePublicClient();
-  const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
 
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const acc = useRef({ second: 0, accrued: 0n, deposit: 0n, rigId: RIG_ID });
+  const depositRef = useRef<bigint>(0n);
+  const accruedRef = useRef<bigint>(0n);
+  const rigIdRef = useRef<bigint>(RIG_ID);
   const settledRef = useRef(false);
 
-  const stop = useCallback(() => {
-    if (timer.current) {
-      clearInterval(timer.current);
-      timer.current = null;
-    }
-  }, []);
+  // Watch FpsReported for OUR session → live spend/FPS + the real reportFps tx hashes.
+  useEffect(() => {
+    if (sessionId === null || !publicClient || !GHOSTRIG_ADDRESS) return;
+    const unwatch = publicClient.watchContractEvent({
+      address: GHOSTRIG_ADDRESS as Address,
+      abi: ghostRigAbi,
+      eventName: "FpsReported",
+      args: { sessionId },
+      pollingInterval: 1_000, // ~1 tick/second feel even when the RPC has no WS
+      onLogs: (logs) => {
+        for (const log of logs) {
+          const args = (log as unknown as { args: { sessionId: bigint; fps: bigint; accrued: bigint } }).args;
+          if (args.sessionId !== sessionId) continue;
 
-  // Settle once: credit the host (demo bus) and best-effort send the real MON.
-  const settle = useCallback(
-    async (accrued: bigint) => {
-      demoBus.settle(accrued); // host panel: claimable += accrued, live cleared
-      if (!REAL_PAYOUT || accrued <= 0n || !address) return;
+          const accrued = args.accrued;
+          const fps = Number(args.fps);
+          const txHash = (log as unknown as { transactionHash: Hex }).transactionHash;
+          accruedRef.current = accrued;
+
+          const deposit = depositRef.current;
+          const remaining = deposit > accrued ? deposit - accrued : 0n;
+          const exhausted = remaining === 0n && accrued > 0n;
+
+          setState((prev) => {
+            const second = prev.elapsed + 1;
+            const trial = accrued === 0n && second <= TRIAL_SECONDS;
+            const tick: FpsTick = { second, fps, accrued, trial, txHash };
+            return {
+              ...prev,
+              phase: exhausted ? "closed" : trial ? "trial" : "billing",
+              accrued,
+              fps,
+              elapsed: second,
+              trialRemaining: Math.max(0, TRIAL_SECONDS - second),
+              remaining,
+              ticks: [tick, ...prev.ticks].slice(0, 40),
+              paidToHost: exhausted ? accrued : prev.paidToHost,
+              refund: exhausted ? deposit - accrued : prev.refund,
+            };
+          });
+
+          if (exhausted) {
+            // The host-agent will (or already did) closeSession on-chain. Just settle
+            // the demo bus once so a same-browser host dashboard reflects it.
+            if (!settledRef.current) {
+              settledRef.current = true;
+              demoBus.settle(accrued);
+            }
+          } else {
+            demoBus.publishLive({ active: true, fps, accrued: accrued.toString(), rigId: Number(rigIdRef.current) });
+          }
+        }
+      },
+      onError: () => {
+        /* transient RPC hiccup — keep the last good state, the next poll recovers */
+      },
+    });
+    return () => unwatch();
+  }, [sessionId, publicClient]);
+
+  // TX 1 — deposit MON into escrow for the selected rig.
+  const open = useCallback(
+    async (depositMon: string, rigId: bigint = RIG_ID) => {
+      if (!GHOSTRIG_ADDRESS) throw new Error("NEXT_PUBLIC_GHOSTRIG_ADDRESS not set");
+      const deposit = parseEther(depositMon || "0");
+      depositRef.current = deposit;
+      accruedRef.current = 0n;
+      rigIdRef.current = rigId;
+      settledRef.current = false;
+      setSessionId(null);
+      setState({ ...initial(), phase: "trial", deposit, remaining: deposit });
+
       try {
-        let host = HOST_ADDRESS_ENV;
-        if (!host && publicClient && GHOSTRIG_ADDRESS) {
-          const rig = (await publicClient.readContract({
+        const hash = await writeContractAsync({
+          address: GHOSTRIG_ADDRESS as Address,
+          abi: ghostRigAbi,
+          functionName: "openSession",
+          args: [rigId],
+          value: deposit,
+        });
+        const receipt = await publicClient?.waitForTransactionReceipt({ hash });
+
+        // Resolve OUR sessionId from the SessionOpened event in the receipt (exact,
+        // not racy like reading sessionCount-1).
+        let id: bigint | null = null;
+        if (receipt) {
+          const events = parseEventLogs({ abi: ghostRigAbi, eventName: "SessionOpened", logs: receipt.logs });
+          const mine = events.find(
+            (e) => (e.args as { client: Address }).client?.toLowerCase() === address?.toLowerCase(),
+          );
+          if (mine) id = (mine.args as { sessionId: bigint }).sessionId;
+        }
+        if (id === null) {
+          // Fallback: newest session.
+          const count = (await publicClient?.readContract({
             address: GHOSTRIG_ADDRESS as Address,
             abi: ghostRigAbi,
-            functionName: "rigs",
-            args: [acc.current.rigId],
-          })) as readonly [Address, bigint, boolean];
-          host = rig[0];
+            functionName: "sessionCount",
+          })) as bigint | undefined;
+          if (count !== undefined) id = count - 1n;
         }
-        if (host && host.toLowerCase() !== ZERO) {
-          await sendTransactionAsync({ to: host, value: accrued });
-        }
+        setSessionId(id);
+        demoBus.publishLive({ active: true, fps: 0, accrued: "0", rigId: Number(rigId) });
       } catch (err) {
-        // Demo keeps working even if the payout tx is rejected/fails.
-        console.error("host payout failed (demo continues):", err);
+        // User rejected the deposit, or the tx failed — back to idle so they can retry.
+        console.error("openSession failed:", err);
+        setState(initial());
+        setSessionId(null);
       }
     },
-    [address, publicClient, sendTransactionAsync],
+    [address, publicClient, writeContractAsync],
   );
 
-  const open = useCallback(
-    (depositMon: string, rigId: bigint = RIG_ID) => {
-      stop();
-      const deposit = parseEther(depositMon || "0");
-      acc.current = { second: 0, accrued: 0n, deposit, rigId };
-      settledRef.current = false;
-      setState({ ...initial(), phase: "trial", deposit, remaining: deposit });
-      demoBus.publishLive({ active: true, fps: 0, accrued: "0", rigId: Number(rigId) });
+  // TX 2 — settle: pay the host the accrued amount, refund the rest to the client.
+  const close = useCallback(async () => {
+    const id = sessionId;
+    const accrued = accruedRef.current;
 
-      timer.current = setInterval(() => {
-        const a = acc.current;
-        a.second += 1;
-        const fps = randomFps();
-        const trial = a.second <= TRIAL_SECONDS;
-        if (!trial) a.accrued += PRICE_PER_SEC;
-        if (a.accrued > a.deposit) a.accrued = a.deposit;
-        const remaining = a.deposit > a.accrued ? a.deposit - a.accrued : 0n;
-        const exhausted = !trial && remaining === 0n;
-
-        const tick: FpsTick = { second: a.second, fps, accrued: a.accrued, trial, txHash: fakeHash() };
-
-        setState((prev) => ({
-          ...prev,
-          phase: exhausted ? "closed" : trial ? "trial" : "billing",
-          accrued: a.accrued,
-          fps,
-          elapsed: a.second,
-          trialRemaining: Math.max(0, TRIAL_SECONDS - a.second),
-          remaining,
-          ticks: [tick, ...prev.ticks].slice(0, 40),
-          paidToHost: exhausted ? a.accrued : prev.paidToHost,
-          refund: exhausted ? a.deposit - a.accrued : prev.refund,
-        }));
-
-        demoBus.publishLive({
-          active: !exhausted,
-          fps,
-          accrued: a.accrued.toString(),
-          rigId: Number(a.rigId),
-        });
-
-        if (exhausted) stop(); // settlement handled by the phase==="closed" effect
-      }, 1000);
-    },
-    [stop],
-  );
-
-  const close = useCallback(() => {
-    stop();
+    // Optimistic UI: show the receipt immediately.
     setState((prev) => ({
       ...prev,
       phase: "closed",
-      paidToHost: prev.accrued,
-      refund: prev.deposit - prev.accrued,
+      paidToHost: accrued,
+      refund: prev.deposit > accrued ? prev.deposit - accrued : 0n,
     }));
-  }, [stop]);
+    if (!settledRef.current) {
+      settledRef.current = true;
+      demoBus.settle(accrued);
+    }
+
+    if (id === null || !GHOSTRIG_ADDRESS) return;
+    try {
+      const hash = await writeContractAsync({
+        address: GHOSTRIG_ADDRESS as Address,
+        abi: ghostRigAbi,
+        functionName: "closeSession",
+        args: [id],
+      });
+      await publicClient?.waitForTransactionReceipt({ hash });
+    } catch (err) {
+      // If the host-agent already closed it on exhaust, closeSession reverts
+      // (SessionNotOpen) — harmless; the settlement already happened on-chain.
+      console.error("closeSession warn (may already be closed):", err);
+    }
+  }, [sessionId, publicClient, writeContractAsync]);
+
+  // Pull your credited funds (client refund / host earnings) into the wallet.
+  const withdraw = useCallback(async () => {
+    if (!GHOSTRIG_ADDRESS) return;
+    const hash = await writeContractAsync({
+      address: GHOSTRIG_ADDRESS as Address,
+      abi: ghostRigAbi,
+      functionName: "withdraw",
+      args: [],
+    });
+    await publicClient?.waitForTransactionReceipt({ hash });
+  }, [publicClient, writeContractAsync]);
 
   const reset = useCallback(() => {
-    stop();
-    settledRef.current = true; // already settled (or never opened) — don't re-fire
-    acc.current = { second: 0, accrued: 0n, deposit: 0n, rigId: RIG_ID };
+    setSessionId(null);
+    depositRef.current = 0n;
+    accruedRef.current = 0n;
+    settledRef.current = false;
     demoBus.publishLive(null);
     setState(initial());
-  }, [stop]);
+  }, []);
 
-  // Single settlement point: whenever we land in "closed" and haven't settled yet.
-  // Covers both manual exit (close) and auto-exhaust inside the ticker.
-  useEffect(() => {
-    if (state.phase !== "closed" || settledRef.current) return;
-    settledRef.current = true;
-    void settle(state.accrued);
-  }, [state.phase, state.accrued, settle]);
-
-  useEffect(() => stop, [stop]);
-
-  return { state, open, close, reset };
+  return { state, open, close, reset, withdraw };
 }

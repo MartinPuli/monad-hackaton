@@ -5,7 +5,14 @@
 // wallet (it must be the one that registered the rig).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from "wagmi";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useChainId,
+  useSwitchChain,
+  useBalance,
+} from "wagmi";
 import { formatEther } from "viem";
 import {
   Wallet,
@@ -20,6 +27,8 @@ import {
   Monitor,
   CheckCircle,
   Eye,
+  Trophy,
+  Gauge,
 } from "@phosphor-icons/react";
 import { KntxMark } from "@/components/KntxMark";
 import { Rail } from "@/components/Rail";
@@ -35,6 +44,8 @@ export default function HostDashboard() {
   const chainId = useChainId();
   const { switchChain, isPending: switching } = useSwitchChain();
   const { earnings, host, registerRig, withdraw, publishHost, priceFromMonPerFps } = useHostEarnings();
+  // Real on-chain wallet balance of the connected host (the "saldo").
+  const { data: balance } = useBalance({ address, query: { enabled: Boolean(address), refetchInterval: 8000 } });
 
   const [priceMon, setPriceMon] = useState("0.000001");
   const [busy, setBusy] = useState<"register" | "withdraw" | null>(null);
@@ -148,6 +159,37 @@ export default function HostDashboard() {
           </div>
         ) : (
           <>
+            {/* Stats strip — saldo + lifetime + session state at a glance */}
+            <div className="kntx-rise grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatTile
+                icon={<Wallet size={15} weight="fill" />}
+                label="Saldo en wallet"
+                value={balance ? fmt(balance.value, 4) : "—"}
+                unit={balance?.symbol ?? "MON"}
+              />
+              <StatTile
+                icon={<Trophy size={15} weight="fill" className="text-accent" />}
+                label="Total cobrado"
+                value={fmt(earnings.totalEarned, 4)}
+                unit="MON"
+                accent="text-accent"
+              />
+              <StatTile
+                icon={<Cpu size={15} weight="fill" />}
+                label="Rigs activos"
+                value={String(earnings.myRigIds.length)}
+                unit={earnings.myRigIds.length === 1 ? "rig" : "rigs"}
+              />
+              <StatTile
+                icon={<Gauge size={15} weight="fill" className={earnings.live ? "text-online" : "text-muted"} />}
+                label="Sesión"
+                value={earnings.live ? String(earnings.lastFps) : "—"}
+                unit={earnings.live ? "FPS" : "inactiva"}
+                accent={earnings.live ? "text-online" : undefined}
+                pulse={earnings.live}
+              />
+            </div>
+
             {/* Live earnings */}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="kntx-rise relative overflow-hidden rounded-xl border border-online/30 bg-surface p-5">
@@ -350,6 +392,41 @@ function CardHead({ icon, label }: { icon: React.ReactNode; label: string }) {
     <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
       {icon}
       {label}
+    </div>
+  );
+}
+
+function StatTile({
+  icon,
+  label,
+  value,
+  unit,
+  accent,
+  pulse,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  unit?: string;
+  accent?: string;
+  pulse?: boolean;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-border bg-surface p-4">
+      {pulse && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-online/10 blur-2xl"
+        />
+      )}
+      <div className="relative mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <span className="text-muted">{icon}</span>
+        {label}
+      </div>
+      <div className={`relative font-display text-2xl font-bold tabular-nums ${accent ?? "text-foreground"}`}>
+        {value}
+        {unit && <span className="ml-1 text-xs font-medium text-muted">{unit}</span>}
+      </div>
     </div>
   );
 }
