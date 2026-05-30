@@ -9,6 +9,9 @@ export const GHOSTRIG_ADDRESS = (process.env.NEXT_PUBLIC_GHOSTRIG_ADDRESS ?? "")
 /** Free trial before billing starts. Must match the contract's TRIAL_SECONDS. */
 export const TRIAL_SECONDS = 10;
 
+/** Monad testnet explorer — base for linking a settlement tx by hash. */
+export const EXPLORER_TX = "https://monad-testnet.socialscan.io/tx/";
+
 /** True until Dev A's contract is deployed and the address is configured. */
 export const MOCK = !GHOSTRIG_ADDRESS;
 
