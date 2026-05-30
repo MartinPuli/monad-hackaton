@@ -85,9 +85,9 @@ export default function Home() {
     <div className="flex min-h-[100dvh] flex-col">
       <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/95 px-5 py-3 backdrop-blur-sm">
         <div className="flex items-center gap-2.5">
-          <KntxMark size={22} className="text-accent" />
+          <KntxMark size={22} className="text-accent kntx-glow" />
           <span className="text-lg font-bold tracking-[0.2em]">KNTX</span>
-          <span className="ml-2 hidden text-xs text-muted sm:inline">
+          <span className="ml-2 hidden border-l border-border pl-3 text-xs text-muted sm:inline">
             rentá FPS, pagás en vivo sobre Monad
           </span>
         </div>
@@ -162,13 +162,13 @@ export default function Home() {
               <StreamView phase={state.phase} fps={state.fps} />
               {trial && (
                 <Badge className="left-3 top-3 bg-online text-[oklch(0.2_0.03_160)]">
-                  <span className="ghost-pulse h-1.5 w-1.5 rounded-full bg-current" />
+                  <span className="kntx-pulse h-1.5 w-1.5 rounded-full bg-current" />
                   PRUEBA GRATIS · {state.trialRemaining}s
                 </Badge>
               )}
               {live && (
                 <Badge className="left-3 top-3 bg-live text-white">
-                  <span className="ghost-pulse h-1.5 w-1.5 rounded-full bg-current" />
+                  <span className="kntx-pulse h-1.5 w-1.5 rounded-full bg-current" />
                   LIVE
                 </Badge>
               )}
@@ -190,7 +190,7 @@ export default function Home() {
                 </p>
               </div>
               <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-online">
-                <span className="ghost-pulse h-2 w-2 rounded-full bg-online" /> online · LAN
+                <span className="kntx-pulse h-2 w-2 rounded-full bg-online" /> online · LAN
               </span>
             </div>
 
@@ -213,7 +213,7 @@ export default function Home() {
                     <div
                       key={t.second}
                       title="Cada segundo el host registra los FPS reales y la deuda se acumula on-chain."
-                      className={`flex items-center justify-between gap-2 px-4 py-1.5 tabular-nums ${i === 0 ? "ghost-tick-in" : ""}`}
+                      className={`flex items-center justify-between gap-2 px-4 py-1.5 tabular-nums ${i === 0 ? "kntx-tick-in" : ""}`}
                     >
                       <span className="w-9 shrink-0 text-muted">s{t.second}</span>
                       <span className="w-14 text-accent">{t.fps} fps</span>
@@ -384,7 +384,7 @@ function StreamView({ phase, fps }: { phase: string; fps: number }) {
   }
   return (
     <div className="text-center">
-      <p className="font-mono text-6xl font-bold tabular-nums text-foreground">{fps}</p>
+      <p className="kntx-glow font-mono text-6xl font-bold tabular-nums text-foreground">{fps}</p>
       <p className="mt-1 text-xs uppercase tracking-[0.3em] text-muted">FPS en vivo</p>
     </div>
   );

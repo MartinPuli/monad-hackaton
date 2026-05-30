@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KNTX — Rent FPS on Monad",
-  description: "Play high-end games on any device. Pay per FPS, settled live on Monad.",
+  title: "KNTX — Rentá FPS, pagás en vivo sobre Monad",
+  description:
+    "Marketplace de cloud gaming pay-per-FPS sobre Monad. Jugá títulos exigentes en cualquier dispositivo y pagá por segundo de FPS entregado, liquidado on-chain.",
   icons: { icon: "/icon.png" },
 };
 

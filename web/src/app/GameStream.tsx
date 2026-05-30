@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { formatEther } from "viem";
 import { SignOut, Lightning, Wallet, Pencil, Monitor } from "@phosphor-icons/react";
+import { KntxMark } from "@/components/KntxMark";
 import type { SessionState } from "@/lib/useSession";
 
 // Default comes from env, but the host can override it live from the app (saved in
@@ -60,7 +61,11 @@ export function GameStream({
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center p-6 text-center">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface/90 p-6 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface/90 p-6 shadow-2xl backdrop-blur-md">
+            <div className="mb-5 flex items-center justify-center gap-2">
+              <KntxMark size={18} className="text-accent kntx-glow" />
+              <span className="text-sm font-bold tracking-[0.2em] text-foreground">KNTX</span>
+            </div>
             <Monitor size={32} weight="duotone" className="mx-auto mb-3 text-accent" />
             <p className="text-lg font-semibold text-foreground">URL del stream del host</p>
             <p className="mt-1 text-sm text-muted">
@@ -72,12 +77,12 @@ export function GameStream({
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveUrl()}
               placeholder="http://<ip-host>:<puerto>/webrtc"
-              className="mt-4 w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-accent"
+              className="mt-4 w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors duration-200 ease-out-quint focus:border-accent"
               autoFocus
             />
             <button
               onClick={saveUrl}
-              className="mt-3 w-full rounded-md bg-accent px-3 py-2 text-sm font-semibold text-black transition-transform duration-200 ease-out hover:opacity-90 active:scale-[0.98]"
+              className="mt-3 w-full rounded-md bg-accent px-3 py-2 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:bg-accent-hover active:scale-[0.98]"
             >
               Conectar stream
             </button>
@@ -88,14 +93,18 @@ export function GameStream({
       {/* Floating payment HUD */}
       <div className="pointer-events-none absolute right-4 top-4 w-64 select-none">
         <div className="pointer-events-auto rounded-xl border border-border bg-surface/90 p-4 shadow-2xl backdrop-blur-md">
+          <div className="mb-3 flex items-center gap-1.5 border-b border-border pb-2.5">
+            <KntxMark size={13} className="text-accent kntx-glow" />
+            <span className="text-[11px] font-bold tracking-[0.2em] text-foreground">KNTX</span>
+          </div>
           {trial ? (
-            <div className="mb-3 flex items-center gap-2 rounded-md bg-emerald-500/15 px-2.5 py-1.5 text-sm font-semibold text-emerald-400">
+            <div className="mb-3 flex items-center gap-2 rounded-md bg-online/15 px-2.5 py-1.5 text-sm font-semibold text-online">
               <Lightning size={16} weight="fill" />
               Prueba gratis · {state.trialRemaining}s
             </div>
           ) : (
             <div className="mb-3 flex items-center gap-2 rounded-md bg-accent/15 px-2.5 py-1.5 text-sm font-semibold text-accent">
-              <Lightning size={16} weight="fill" />
+              <Lightning size={16} weight="fill" className="kntx-pulse" />
               Cobrando en vivo
             </div>
           )}
@@ -106,7 +115,7 @@ export function GameStream({
 
           <button
             onClick={() => setEditing(true)}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-muted transition-colors hover:text-foreground"
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-muted transition-colors duration-200 ease-out-quint hover:bg-surface-3 hover:text-foreground"
           >
             <Pencil size={13} weight="bold" />
             Cambiar URL del stream
@@ -114,7 +123,7 @@ export function GameStream({
 
           <button
             onClick={onExit}
-            className="pointer-events-auto mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-red-500/90 px-3 py-2 text-sm font-semibold text-white transition-transform duration-200 ease-out hover:bg-red-500 active:scale-[0.98]"
+            className="pointer-events-auto mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-live px-3 py-2 text-sm font-bold text-white transition-transform duration-200 ease-out-quint hover:opacity-90 active:scale-[0.98]"
           >
             <SignOut size={16} weight="bold" />
             Salir y liquidar

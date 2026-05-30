@@ -39,6 +39,13 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+  /* Subtle brand atmosphere: two faint radial pools tinted to the KNTX hue,
+     anchored top-left and bottom-right so the deep indigo-black never reads flat.
+     Fixed so it stays put behind scrolling content; very low alpha — texture, not gradient soup. */
+  background-image:
+    radial-gradient(60rem 60rem at 12% -8%, oklch(0.4 0.13 286 / 0.16), transparent 60%),
+    radial-gradient(48rem 48rem at 105% 112%, oklch(0.42 0.12 286 / 0.12), transparent 60%);
+  background-attachment: fixed;
 }
 
 /* Keyboard focus ring — visible, accent-tinted, never removed without replacement */
@@ -55,23 +62,28 @@ body {
 }
 
 /* Live status dot — soft breathing pulse (transform/opacity only) */
-@keyframes ghost-pulse {
+@keyframes kntx-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.82); }
 }
-.ghost-pulse {
-  animation: ghost-pulse 1.8s var(--ease-out-quint) infinite;
+.kntx-pulse {
+  animation: kntx-pulse 1.8s var(--ease-out-quint) infinite;
 }
 
 /* Event-row enter — subtle slide+fade for the newest reportFps tick */
-@keyframes ghost-tick-in {
+@keyframes kntx-tick-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.ghost-tick-in {
-  animation: ghost-tick-in 0.28s var(--ease-out-quint);
+.kntx-tick-in {
+  animation: kntx-tick-in 0.28s var(--ease-out-quint);
+}
+
+/* Accent glow — for the live-FPS hero number and brand mark. Drop-shadow only. */
+.kntx-glow {
+  filter: drop-shadow(0 0 18px oklch(0.6 0.2 286 / 0.45));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ghost-pulse, .ghost-tick-in { animation: none; }
+  .kntx-pulse, .kntx-tick-in { animation: none; }
 }
